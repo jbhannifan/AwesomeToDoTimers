@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
+import confetti from "canvas-confetti";
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
+  const [completedTasks, setCompletedTasks] = useState([]);
   const [taskName, setTaskName] = useState("");
   const [minutes, setMinutes] = useState("");
   const [showSummary, setShowSummary] = useState(false);
@@ -33,10 +35,30 @@ export default function App() {
     setTimerRunning(true);
   }
 
+  function completeTask() {
+    if (activeTaskIndex === null) return;
+    const finishedTask = tasks[activeTaskIndex];
+    setCompletedTasks([...completedTasks, finishedTask]);
+    const remaining = tasks.filter((_, i) => i !== activeTaskIndex);
+    setTasks(remaining);
+    setActiveTaskIndex(null);
+    setSecondsLeft(0);
+    setTimerRunning(false);
+    triggerConfetti();
+  }
+
   function stopTimer() {
     setTimerRunning(false);
     setActiveTaskIndex(null);
     setSecondsLeft(0);
+  }
+
+  function triggerConfetti() {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
   }
 
   useEffect(() => {
@@ -45,7 +67,7 @@ export default function App() {
       setSecondsLeft((s) => {
         if (s <= 1) {
           clearInterval(interval);
-          stopTimer();
+          completeTask();
           return 0;
         }
         return s - 1;
@@ -55,6 +77,7 @@ export default function App() {
   }, [timerRunning]);
 
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
+  const completedTotal = completedTasks.reduce((sum, t) => sum + t.minutes, 0);
 
   if (timerRunning && activeTaskIndex !== null) {
     const currentTask = tasks[activeTaskIndex];
@@ -69,7 +92,7 @@ export default function App() {
         </div>
         <button
           className="bg-red-500 px-6 py-3 rounded text-white"
-          onClick={stopTimer}
+          onClick={completeTask}
         >
           Finish Early
         </button>
@@ -108,9 +131,22 @@ export default function App() {
             </li>
           ))}
         </ul>
-        <p className="font-semibold mb-4">Total time: {totalMinutes} minutes</p>
+        <p className="font-semibold mb-2">Remaining: {totalMinutes} min</p>
+        <p className="font-semibold mb-4 text-green-600">
+          Completed: {completedTotal} min
+        </p>
+        {completedTasks.length > 0 && (
+          <div className="mt-4">
+            <h2 className="font-bold mb-2">Finished Today</h2>
+            <ul>
+              {completedTasks.map((task, i) => (
+                <li key={i}>{task.name} – {task.minutes} min</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <button
-          className="bg-gray-500 text-white px-4 py-2 rounded"
+          className="bg-gray-500 text-white px-4 py-2 mt-4 rounded"
           onClick={() => setShowSummary(false)}
         >
           Add More Tasks
