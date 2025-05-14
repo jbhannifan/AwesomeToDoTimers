@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
@@ -18,6 +18,8 @@ export default function App() {
     const saved = localStorage.getItem("dailyGoal");
     return saved ? parseInt(saved) : 90;
   });
+
+  const endTimeRef = useRef(null);
 
   useEffect(() => {
     localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
@@ -48,6 +50,7 @@ export default function App() {
     const seconds = tasks[index].minutes * 60;
     setActiveTaskIndex(index);
     setSecondsLeft(seconds);
+    endTimeRef.current = Date.now() + seconds * 1000;
     setTimerRunning(true);
   }
 
@@ -79,14 +82,12 @@ export default function App() {
   useEffect(() => {
     if (!timerRunning) return;
     const interval = setInterval(() => {
-      setSecondsLeft((s) => {
-        if (s <= 1) {
-          clearInterval(interval);
-          completeTask();
-          return 0;
-        }
-        return s - 1;
-      });
+      const remaining = Math.max(0, Math.floor((endTimeRef.current - Date.now()) / 1000));
+      setSecondsLeft(remaining);
+      if (remaining === 0) {
+        clearInterval(interval);
+        completeTask();
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, [timerRunning]);
