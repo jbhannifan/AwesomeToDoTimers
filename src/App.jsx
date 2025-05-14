@@ -145,11 +145,22 @@ export default function App() {
         {completedTasks.length > 0 && (
           <div className="mt-4">
             <h2 className="font-bold mb-2">Finished Tasks</h2>
-            <ul>
+            <ul className="mb-2">
               {completedTasks.map((task, i) => (
                 <li key={i}>{task.name} – {task.minutes} min</li>
               ))}
             </ul>
+            <button
+              className="bg-red-500 text-white px-3 py-1 rounded"
+              onClick={() => {
+                if (confirm("Clear all completed tasks?")) {
+                  setCompletedTasks([]);
+                  localStorage.removeItem("completedTasks");
+                }
+              }}
+            >
+              Clear History
+            </button>
           </div>
         )}
         <button
