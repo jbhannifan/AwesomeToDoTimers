@@ -53,14 +53,16 @@ export default function App() {
     setSecondsLeft(0);
   }
 
-  function triggerConfetti() {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
-  }
+ function triggerConfetti() {
+  confetti({
+    particleCount: 100,
+    spread: 70,
+    origin: { y: 0.6 },
+  });
 
+  const audio = new Audio("/applause.mp3");
+  audio.play();
+}
   useEffect(() => {
     if (!timerRunning) return;
     const interval = setInterval(() => {
