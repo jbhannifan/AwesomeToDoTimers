@@ -1,10 +1,13 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
   const [taskName, setTaskName] = useState("");
   const [minutes, setMinutes] = useState("");
   const [showSummary, setShowSummary] = useState(false);
+  const [activeTaskIndex, setActiveTaskIndex] = useState(null);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [timerRunning, setTimerRunning] = useState(false);
 
   function addTask() {
     if (!taskName || !minutes) return;
@@ -23,7 +26,56 @@ export default function App() {
     setTasks(updated);
   }
 
+  function startTimer(index) {
+    const seconds = tasks[index].minutes * 60;
+    setActiveTaskIndex(index);
+    setSecondsLeft(seconds);
+    setTimerRunning(true);
+  }
+
+  function stopTimer() {
+    setTimerRunning(false);
+    setActiveTaskIndex(null);
+    setSecondsLeft(0);
+  }
+
+  useEffect(() => {
+    if (!timerRunning) return;
+    const interval = setInterval(() => {
+      setSecondsLeft((s) => {
+        if (s <= 1) {
+          clearInterval(interval);
+          stopTimer();
+          return 0;
+        }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [timerRunning]);
+
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
+
+  if (timerRunning && activeTaskIndex !== null) {
+    const currentTask = tasks[activeTaskIndex];
+    const min = Math.floor(secondsLeft / 60);
+    const sec = secondsLeft % 60;
+    return (
+      <div className="flex flex-col items-center justify-center h-screen bg-black text-white text-center">
+        <h2 className="text-2xl mb-4">Current Task</h2>
+        <h1 className="text-4xl font-bold mb-6">{currentTask.name}</h1>
+        <div className="text-6xl font-mono mb-6">
+          {String(min).padStart(2, "0")}:{String(sec).padStart(2, "0")}
+        </div>
+        <button
+          className="bg-red-500 px-6 py-3 rounded text-white"
+          onClick={stopTimer}
+        >
+          Finish Early
+        </button>
+      </div>
+    );
+  }
 
   if (showSummary) {
     return (
@@ -45,6 +97,12 @@ export default function App() {
                   className="bg-gray-200 px-2 rounded"
                 >
                   ⬇️
+                </button>
+                <button
+                  onClick={() => startTimer(i)}
+                  className="bg-green-500 text-white px-2 rounded"
+                >
+                  ▶️
                 </button>
               </div>
             </li>
