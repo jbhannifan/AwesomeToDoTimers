@@ -2,8 +2,10 @@ import { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
 
 export default function App() {
-  const [tasks, setTasks] = useState([]);
-  const [completedTasks, setCompletedTasks] = useState([]);
+const [completedTasks, setCompletedTasks] = useState(() => {
+  const saved = localStorage.getItem("completedTasks");
+  return saved ? JSON.parse(saved) : [];
+});
   const [taskName, setTaskName] = useState("");
   const [minutes, setMinutes] = useState("");
   const [showSummary, setShowSummary] = useState(false);
@@ -77,6 +79,10 @@ export default function App() {
     }, 1000);
     return () => clearInterval(interval);
   }, [timerRunning]);
+
+  useEffect(() => {
+  localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
+}, [completedTasks]);
 
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
   const completedTotal = completedTasks.reduce((sum, t) => sum + t.minutes, 0);
