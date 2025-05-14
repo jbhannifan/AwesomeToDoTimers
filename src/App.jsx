@@ -2,6 +2,21 @@ import { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
+const motivationalQuotes = [
+  "Great job! Keep going!",
+  "You’re on fire today!",
+  "Every step counts!",
+  "Progress is progress!",
+  "Another one done — nice work!"
+];
+
+const soundFiles = {
+  none: null,
+  chime: "/chime.mp3",
+  ding: "/ding.mp3",
+  pop: "/pop.mp3"
+};
+
 export default function App() {
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState(() => {
@@ -18,6 +33,8 @@ export default function App() {
     const saved = localStorage.getItem("dailyGoal");
     return saved ? parseInt(saved) : 90;
   });
+  const [sound, setSound] = useState("chime");
+  const [quote, setQuote] = useState("");
 
   const taskInputRef = useRef(null);
   const endTimeRef = useRef(null);
@@ -29,6 +46,13 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("dailyGoal", dailyGoal);
   }, [dailyGoal]);
+
+  function playSound() {
+    if (sound !== "none" && soundFiles[sound]) {
+      const audio = new Audio(soundFiles[sound]);
+      audio.play();
+    }
+  }
 
   function addTask() {
     if (!taskName || !minutes) return;
@@ -69,6 +93,8 @@ export default function App() {
     setSecondsLeft(0);
     setTimerRunning(false);
     triggerConfetti();
+    playSound();
+    setQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
   }
 
   function stopTimer() {
@@ -170,6 +196,18 @@ export default function App() {
             Today: {todayCompleted} of {dailyGoal} min ({Math.round((todayCompleted / dailyGoal) * 100) || 0}%)
           </p>
         </div>
+
+        <div className="mb-4">
+          <label className="block font-semibold mb-1">Celebration Sound:</label>
+          <select value={sound} onChange={(e) => setSound(e.target.value)} className="border p-2 w-full">
+            <option value="chime">Chime</option>
+            <option value="ding">Ding</option>
+            <option value="pop">Pop</option>
+            <option value="none">None</option>
+          </select>
+        </div>
+
+        {quote && <p className="italic text-center text-blue-500 mt-2">“{quote}”</p>}
 
         <h2 className="font-bold mt-6 mb-2">Last 7 Days</h2>
         <div className="w-full h-48 mb-6">
