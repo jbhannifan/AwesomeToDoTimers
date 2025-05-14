@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
@@ -104,6 +105,16 @@ export default function App() {
     return acc;
   }, {});
 
+  const summaryData = Array.from({ length: 7 }).map((_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (6 - i));
+    const dateStr = d.toISOString().slice(0, 10);
+    const total = completedTasks
+      .filter((t) => t.date === dateStr)
+      .reduce((sum, t) => sum + t.minutes, 0);
+    return { date: dateStr.slice(5), minutes: total };
+  });
+
   if (timerRunning && activeTaskIndex !== null) {
     const currentTask = tasks[activeTaskIndex];
     const min = Math.floor(secondsLeft / 60);
@@ -155,6 +166,18 @@ export default function App() {
           <p className="text-sm">
             Today: {todayCompleted} of {dailyGoal} min ({Math.round((todayCompleted / dailyGoal) * 100) || 0}%)
           </p>
+        </div>
+
+        <h2 className="font-bold mt-6 mb-2">Last 7 Days</h2>
+        <div className="w-full h-48 mb-6">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={summaryData}>
+              <XAxis dataKey="date" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="minutes" fill="#38bdf8" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
         {Object.keys(groupedCompleted).length > 0 && (
