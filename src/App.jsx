@@ -13,10 +13,18 @@ export default function App() {
   const [activeTaskIndex, setActiveTaskIndex] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+  const [dailyGoal, setDailyGoal] = useState(() => {
+    const saved = localStorage.getItem("dailyGoal");
+    return saved ? parseInt(saved) : 90;
+  });
 
   useEffect(() => {
     localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
   }, [completedTasks]);
+
+  useEffect(() => {
+    localStorage.setItem("dailyGoal", dailyGoal);
+  }, [dailyGoal]);
 
   function addTask() {
     if (!taskName || !minutes) return;
@@ -85,6 +93,11 @@ export default function App() {
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
   const completedTotal = completedTasks.reduce((sum, t) => sum + t.minutes, 0);
 
+  const today = new Date().toISOString().slice(0, 10);
+  const todayCompleted = completedTasks
+    .filter((t) => t.date === today)
+    .reduce((sum, t) => sum + t.minutes, 0);
+
   const groupedCompleted = completedTasks.reduce((acc, task) => {
     if (!acc[task.date]) acc[task.date] = [];
     acc[task.date].push(task);
@@ -129,7 +142,20 @@ export default function App() {
           ))}
         </ul>
         <p className="font-semibold mb-2">Remaining: {totalMinutes} min</p>
-        <p className="font-semibold mb-4 text-green-600">Completed: {completedTotal} min</p>
+        <p className="font-semibold mb-2 text-green-600">Completed: {completedTotal} min</p>
+
+        <div className="mb-4">
+          <label className="block font-semibold mb-1">Daily Goal (min):</label>
+          <input
+            type="number"
+            value={dailyGoal}
+            onChange={(e) => setDailyGoal(parseInt(e.target.value))}
+            className="border p-2 w-full mb-1"
+          />
+          <p className="text-sm">
+            Today: {todayCompleted} of {dailyGoal} min ({Math.round((todayCompleted / dailyGoal) * 100) || 0}%)
+          </p>
+        </div>
 
         {Object.keys(groupedCompleted).length > 0 && (
           <div className="mt-4">
