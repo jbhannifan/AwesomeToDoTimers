@@ -19,6 +19,7 @@ export default function App() {
     return saved ? parseInt(saved) : 90;
   });
 
+  const taskInputRef = useRef(null);
   const endTimeRef = useRef(null);
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function App() {
     setTasks([...tasks, { name: taskName, minutes: parseInt(minutes) }]);
     setTaskName("");
     setMinutes("");
+    setTimeout(() => taskInputRef.current?.focus(), 0);
   }
 
   function moveTask(index, direction) {
@@ -222,6 +224,7 @@ export default function App() {
     <div className="max-w-md mx-auto p-4">
       <h1 className="text-2xl font-bold mb-4">Todo Timer</h1>
       <input
+        ref={taskInputRef}
         className="border p-2 mb-2 w-full"
         placeholder="Task name"
         value={taskName}
