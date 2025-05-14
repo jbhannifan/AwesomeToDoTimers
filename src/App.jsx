@@ -2,16 +2,21 @@ import { useState, useEffect } from "react";
 import confetti from "canvas-confetti";
 
 export default function App() {
-const [completedTasks, setCompletedTasks] = useState(() => {
-  const saved = localStorage.getItem("completedTasks");
-  return saved ? JSON.parse(saved) : [];
-});
+  const [tasks, setTasks] = useState([]);
+  const [completedTasks, setCompletedTasks] = useState(() => {
+    const saved = localStorage.getItem("completedTasks");
+    return saved ? JSON.parse(saved) : [];
+  });
   const [taskName, setTaskName] = useState("");
   const [minutes, setMinutes] = useState("");
   const [showSummary, setShowSummary] = useState(false);
   const [activeTaskIndex, setActiveTaskIndex] = useState(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [timerRunning, setTimerRunning] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
+  }, [completedTasks]);
 
   function addTask() {
     if (!taskName || !minutes) return;
@@ -55,16 +60,14 @@ const [completedTasks, setCompletedTasks] = useState(() => {
     setSecondsLeft(0);
   }
 
- function triggerConfetti() {
-  confetti({
-    particleCount: 100,
-    spread: 70,
-    origin: { y: 0.6 },
-  });
+  function triggerConfetti() {
+    confetti({
+      particleCount: 100,
+      spread: 70,
+      origin: { y: 0.6 },
+    });
+  }
 
-  const audio = new Audio("/applause.mp3");
-  audio.play();
-}
   useEffect(() => {
     if (!timerRunning) return;
     const interval = setInterval(() => {
@@ -79,10 +82,6 @@ const [completedTasks, setCompletedTasks] = useState(() => {
     }, 1000);
     return () => clearInterval(interval);
   }, [timerRunning]);
-
-  useEffect(() => {
-  localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
-}, [completedTasks]);
 
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
   const completedTotal = completedTasks.reduce((sum, t) => sum + t.minutes, 0);
@@ -145,7 +144,7 @@ const [completedTasks, setCompletedTasks] = useState(() => {
         </p>
         {completedTasks.length > 0 && (
           <div className="mt-4">
-            <h2 className="font-bold mb-2">Finished Today</h2>
+            <h2 className="font-bold mb-2">Finished Tasks</h2>
             <ul>
               {completedTasks.map((task, i) => (
                 <li key={i}>{task.name} – {task.minutes} min</li>
