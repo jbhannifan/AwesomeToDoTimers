@@ -13,6 +13,16 @@ export default function App() {
     setMinutes("");
   }
 
+  function moveTask(index, direction) {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= tasks.length) return;
+    const updated = [...tasks];
+    const temp = updated[newIndex];
+    updated[newIndex] = updated[index];
+    updated[index] = temp;
+    setTasks(updated);
+  }
+
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
 
   if (showSummary) {
@@ -21,8 +31,22 @@ export default function App() {
         <h1 className="text-2xl font-bold mb-4">Task List</h1>
         <ul className="mb-4">
           {tasks.map((task, i) => (
-            <li key={i} className="mb-1">
-              {task.name} – {task.minutes} min
+            <li key={i} className="flex items-center justify-between mb-1">
+              <span>{task.name} – {task.minutes} min</span>
+              <div className="space-x-1">
+                <button
+                  onClick={() => moveTask(i, -1)}
+                  className="bg-gray-200 px-2 rounded"
+                >
+                  ⬆️
+                </button>
+                <button
+                  onClick={() => moveTask(i, 1)}
+                  className="bg-gray-200 px-2 rounded"
+                >
+                  ⬇️
+                </button>
+              </div>
             </li>
           ))}
         </ul>
