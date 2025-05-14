@@ -44,7 +44,10 @@ export default function App() {
 
   function completeTask() {
     if (activeTaskIndex === null) return;
-    const finishedTask = tasks[activeTaskIndex];
+    const finishedTask = {
+      ...tasks[activeTaskIndex],
+      date: new Date().toISOString().slice(0, 10),
+    };
     setCompletedTasks([...completedTasks, finishedTask]);
     const remaining = tasks.filter((_, i) => i !== activeTaskIndex);
     setTasks(remaining);
@@ -61,11 +64,7 @@ export default function App() {
   }
 
   function triggerConfetti() {
-    confetti({
-      particleCount: 100,
-      spread: 70,
-      origin: { y: 0.6 },
-    });
+    confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
   }
 
   useEffect(() => {
@@ -85,6 +84,12 @@ export default function App() {
 
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
   const completedTotal = completedTasks.reduce((sum, t) => sum + t.minutes, 0);
+
+  const groupedCompleted = completedTasks.reduce((acc, task) => {
+    if (!acc[task.date]) acc[task.date] = [];
+    acc[task.date].push(task);
+    return acc;
+  }, {});
 
   if (timerRunning && activeTaskIndex !== null) {
     const currentTask = tasks[activeTaskIndex];
@@ -116,40 +121,29 @@ export default function App() {
             <li key={i} className="flex items-center justify-between mb-1">
               <span>{task.name} – {task.minutes} min</span>
               <div className="space-x-1">
-                <button
-                  onClick={() => moveTask(i, -1)}
-                  className="bg-gray-200 px-2 rounded"
-                >
-                  ⬆️
-                </button>
-                <button
-                  onClick={() => moveTask(i, 1)}
-                  className="bg-gray-200 px-2 rounded"
-                >
-                  ⬇️
-                </button>
-                <button
-                  onClick={() => startTimer(i)}
-                  className="bg-green-500 text-white px-2 rounded"
-                >
-                  ▶️
-                </button>
+                <button onClick={() => moveTask(i, -1)} className="bg-gray-200 px-2 rounded">⬆️</button>
+                <button onClick={() => moveTask(i, 1)} className="bg-gray-200 px-2 rounded">⬇️</button>
+                <button onClick={() => startTimer(i)} className="bg-green-500 text-white px-2 rounded">▶️</button>
               </div>
             </li>
           ))}
         </ul>
         <p className="font-semibold mb-2">Remaining: {totalMinutes} min</p>
-        <p className="font-semibold mb-4 text-green-600">
-          Completed: {completedTotal} min
-        </p>
-        {completedTasks.length > 0 && (
+        <p className="font-semibold mb-4 text-green-600">Completed: {completedTotal} min</p>
+
+        {Object.keys(groupedCompleted).length > 0 && (
           <div className="mt-4">
             <h2 className="font-bold mb-2">Finished Tasks</h2>
-            <ul className="mb-2">
-              {completedTasks.map((task, i) => (
-                <li key={i}>{task.name} – {task.minutes} min</li>
-              ))}
-            </ul>
+            {Object.entries(groupedCompleted).map(([date, items]) => (
+              <div key={date} className="mb-3">
+                <h3 className="font-semibold underline mb-1">{date}</h3>
+                <ul>
+                  {items.map((task, i) => (
+                    <li key={i}>{task.name} – {task.minutes} min</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
             <button
               className="bg-red-500 text-white px-3 py-1 rounded"
               onClick={() => {
@@ -163,6 +157,7 @@ export default function App() {
             </button>
           </div>
         )}
+
         <button
           className="bg-gray-500 text-white px-4 py-2 mt-4 rounded"
           onClick={() => setShowSummary(false)}
@@ -193,25 +188,12 @@ export default function App() {
         }}
       />
       <div className="flex gap-2 mb-4">
-        <button
-          className="bg-blue-500 text-white px-4 py-2 rounded"
-          onClick={addTask}
-        >
-          Add Task
-        </button>
-        <button
-          className="bg-green-600 text-white px-4 py-2 rounded"
-          onClick={() => setShowSummary(true)}
-        >
-          Finished Entering
-        </button>
+        <button className="bg-blue-500 text-white px-4 py-2 rounded" onClick={addTask}>Add Task</button>
+        <button className="bg-green-600 text-white px-4 py-2 rounded" onClick={() => setShowSummary(true)}>Finished Entering</button>
       </div>
-
       <ul>
         {tasks.map((task, i) => (
-          <li key={i} className="mb-1">
-            {task.name} – {task.minutes} min
-          </li>
+          <li key={i} className="mb-1">{task.name} – {task.minutes} min</li>
         ))}
       </ul>
     </div>
