@@ -132,8 +132,12 @@ export default function App() {
 
         <ul className="space-y-3 mb-6">
           {completedTasks.map((task, i) => (
-            <li key={i} className="bg-gray-100 p-3 rounded shadow-sm">
-              <strong>{task.name}</strong> - {task.minutes} min <span className="text-sm text-gray-500">({task.date})</span>
+            <li key={i} className="bg-green-50 border border-green-200 p-3 rounded shadow-sm flex items-center gap-2">
+              <span className="text-green-600 text-xl">✅</span>
+              <div>
+                <strong>{task.name}</strong> - {task.minutes} min<br />
+                <span className="text-xs text-gray-500">Completed: {task.date}</span>
+              </div>
             </li>
           ))}
         </ul>
