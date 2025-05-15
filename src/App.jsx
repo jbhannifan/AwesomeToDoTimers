@@ -1,6 +1,20 @@
 import { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  DndContext,
+  closestCenter,
+  PointerSensor,
+  useSensor,
+  useSensors
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  useSortable,
+  verticalListSortingStrategy
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 const motivationalQuotes = [
   "Great job! Keep going!",
@@ -10,7 +24,42 @@ const motivationalQuotes = [
   "Another one done — nice work!"
 ];
 
-const chime = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
+const chime = new Audio("https://actions.google.com/sounds/v1/alarms/digital_watch_alarm_long.ogg");
+chime.volume = 0.3;
+
+function SortableTask({ task, id, index, onStart }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+  } = useSortable({ id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <li
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      className="flex justify-between items-center bg-gray-100 p-3 rounded shadow-sm"
+    >
+      <div className="cursor-grab text-gray-500 mr-2" {...listeners}>⠿</div>
+      <div className="flex-1">
+        <strong>{task.name}</strong>
+        <span className="ml-2 text-sm text-gray-600">({task.minutes} min)</span>
+      </div>
+      <button
+        onClick={() => onStart(index)}
+        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600"
+      >▶</button>
+    </li>
+  );
+}
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
@@ -33,6 +82,8 @@ export default function App() {
   const taskInputRef = useRef(null);
   const endTimeRef = useRef(null);
 
+  const sensors = useSensors(useSensor(PointerSensor));
+
   useEffect(() => {
     localStorage.setItem("completedTasks", JSON.stringify(completedTasks));
   }, [completedTasks]);
@@ -47,16 +98,6 @@ export default function App() {
     setTaskName("");
     setMinutes("");
     setTimeout(() => taskInputRef.current?.focus(), 0);
-  }
-
-  function moveTask(index, direction) {
-    const newIndex = index + direction;
-    if (newIndex < 0 || newIndex >= tasks.length) return;
-    const updated = [...tasks];
-    const temp = updated[newIndex];
-    updated[newIndex] = updated[index];
-    updated[index] = temp;
-    setTasks(updated);
   }
 
   function startTimer(index) {
@@ -112,6 +153,14 @@ export default function App() {
       return acc;
     }, {})
   ).sort((a, b) => a.date.localeCompare(b.date));
+
+  function handleDragEnd(event) {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const oldIndex = tasks.findIndex((t, i) => i.toString() === active.id);
+    const newIndex = tasks.findIndex((t, i) => i.toString() === over.id);
+    setTasks(arrayMove(tasks, oldIndex, newIndex));
+  }
 
   if (showSummary) {
     return (
@@ -186,21 +235,15 @@ export default function App() {
       </div>
 
       {tasks.length > 0 && (
-        <ul className="space-y-2">
-          {tasks.map((task, i) => (
-            <li key={i} className="flex justify-between items-center bg-gray-100 p-3 rounded shadow-sm">
-              <div>
-                <strong>{task.name}</strong>
-                <span className="ml-2 text-sm text-gray-600">({task.minutes} min)</span>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={() => moveTask(i, -1)} className="text-gray-500 hover:text-gray-800">⬆️</button>
-                <button onClick={() => moveTask(i, 1)} className="text-gray-500 hover:text-gray-800">⬇️</button>
-                <button onClick={() => startTimer(i)} className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600">▶</button>
-              </div>
-            </li>
-          ))}
-        </ul>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tasks.map((_, i) => i.toString())} strategy={verticalListSortingStrategy}>
+            <ul className="space-y-2">
+              {tasks.map((task, i) => (
+                <SortableTask key={i} id={i.toString()} task={task} index={i} onStart={startTimer} />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
       )}
 
       {timerRunning && activeTaskIndex !== null && (
