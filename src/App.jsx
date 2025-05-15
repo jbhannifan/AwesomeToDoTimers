@@ -102,6 +102,51 @@ export default function App() {
 
   const totalMinutes = tasks.reduce((sum, task) => sum + task.minutes, 0);
 
+  const chartData = Object.values(
+    completedTasks.reduce((acc, task) => {
+      acc[task.date] = acc[task.date] || { date: task.date, minutes: 0 };
+      acc[task.date].minutes += task.minutes;
+      return acc;
+    }, {})
+  ).sort((a, b) => a.date.localeCompare(b.date));
+
+  if (showSummary) {
+    return (
+      <div className="max-w-2xl mx-auto px-6 py-10">
+        <h2 className="text-3xl font-bold text-center text-blue-600 mb-6">Productivity Summary</h2>
+
+        <div className="mb-6">
+          {chartData.length > 0 ? (
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={chartData}>
+                <XAxis dataKey="date" />
+                <YAxis />
+                <Tooltip />
+                <Bar dataKey="minutes" fill="#3b82f6" />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <p className="text-center text-gray-500">No completed tasks yet.</p>
+          )}
+        </div>
+
+        <ul className="space-y-3 mb-6">
+          {completedTasks.map((task, i) => (
+            <li key={i} className="bg-gray-100 p-3 rounded shadow-sm">
+              <strong>{task.name}</strong> - {task.minutes} min <span className="text-sm text-gray-500">({task.date})</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="text-center">
+          <button className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700" onClick={() => setShowSummary(false)}>
+            Back to Task Entry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="max-w-xl mx-auto px-6 py-10">
       <header className="mb-8 text-center">
