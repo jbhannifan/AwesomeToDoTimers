@@ -1,3 +1,4 @@
+// Full App.jsx with streak tracker and UI restored
 import { useState, useEffect, useRef } from "react";
 import confetti from "canvas-confetti";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -194,7 +195,61 @@ export default function App() {
         <p className="text-green-600 font-semibold mt-2">🔥 Streak: {streak.count} day{streak.count === 1 ? "" : "s"}</p>
       </header>
 
-      {/* rest of app unchanged... */}
+      <div className="bg-white shadow rounded-lg p-4 mb-6">
+        <input
+          ref={taskInputRef}
+          className="border p-2 mb-2 w-full rounded"
+          placeholder="Task name"
+          value={taskName}
+          onChange={(e) => setTaskName(e.target.value)}
+        />
+        <input
+          className="border p-2 mb-2 w-full rounded"
+          placeholder="Minutes"
+          type="number"
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") addTask();
+          }}
+        />
+        <div className="flex gap-2">
+          <button className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600" onClick={addTask}>Add Task</button>
+          <button className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" onClick={() => setShowSummary(true)}>Finished Entering</button>
+        </div>
+      </div>
+
+      {tasks.length > 0 && (
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={tasks.map((_, i) => i.toString())} strategy={verticalListSortingStrategy}>
+            <ul className="space-y-2">
+              {tasks.map((task, i) => (
+                <SortableTask key={i} id={i.toString()} task={task} index={i} onStart={startTimer} />
+              ))}
+            </ul>
+          </SortableContext>
+        </DndContext>
+      )}
+
+      {timerRunning && activeTaskIndex !== null && (
+        <div className="fixed top-0 left-0 w-full h-full flex flex-col items-center justify-center bg-black text-white z-50">
+          <h2 className="text-3xl font-bold mb-2">{tasks[activeTaskIndex].name}</h2>
+          <div className="text-6xl font-mono mb-4">
+            {String(Math.floor(secondsLeft / 60)).padStart(2, "0")}:{String(secondsLeft % 60).padStart(2, "0")}
+          </div>
+          <button onClick={completeTask} className="bg-red-500 px-6 py-2 rounded text-white">Finish Early</button>
+        </div>
+      )}
+
+      {quote && (
+        <div className="mt-6 text-center italic text-blue-600">
+          “{quote}”
+        </div>
+      )}
+
+      <div className="mt-8 text-center text-sm text-gray-400">
+        {totalMinutes > 0 && <p>Total remaining: {totalMinutes} min</p>}
+      </div>
     </div>
   );
 }
