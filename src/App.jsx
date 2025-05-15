@@ -10,6 +10,8 @@ const motivationalQuotes = [
   "Another one done — nice work!"
 ];
 
+const chime = new Audio("https://actions.google.com/sounds/v1/alarms/alarm_clock.ogg");
+
 export default function App() {
   const [tasks, setTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState(() => {
@@ -79,6 +81,7 @@ export default function App() {
     setTimerRunning(false);
     confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     setQuote(motivationalQuotes[Math.floor(Math.random() * motivationalQuotes.length)]);
+    chime.play();
   }
 
   function stopTimer() {
