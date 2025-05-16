@@ -1,139 +1,148 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { DndContext, closestCenter } from '@dnd-kit/core';
-import {
-  arrayMove,
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from '@dnd-kit/sortable';
-import { CSS } from '@dnd-kit/utilities';
-
-function SortableItem({ id, task, time, onPlay, isRunning, onRemove }) {
-  const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id });
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      {...attributes}
-      className="bg-white p-3 rounded shadow mb-2 flex justify-between items-center"
-    >
-      <div {...listeners} className="cursor-grab mr-2">☰</div>
-      <div className="flex-1">{task} - {time} min</div>
-      <button
-        onClick={onPlay}
-        disabled={isRunning}
-        className="bg-green-500 text-white px-2 py-1 rounded disabled:opacity-50"
-      >▶</button>
-      <button
-        onClick={onRemove}
-        className="bg-red-500 text-white px-2 py-1 ml-2 rounded"
-      >✖</button>
-    </div>
-  );
-}
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
-  const [task, setTask] = useState('');
-  const [time, setTime] = useState('');
-  const [currentIndex, setCurrentIndex] = useState(null);
+  const [taskName, setTaskName] = useState('');
+  const [taskMinutes, setTaskMinutes] = useState('');
+  const [isEntering, setIsEntering] = useState(true);
+  const [activeTaskIndex, setActiveTaskIndex] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const timerRef = useRef(null);
 
-  useEffect(() => {
-    if (timeLeft <= 0 && currentIndex !== null) {
-      clearInterval(timerRef.current);
-      setCurrentIndex(null);
-    }
-  }, [timeLeft, currentIndex]);
-
   const handleAddTask = () => {
-    if (task && time) {
-      setTasks([...tasks, { id: crypto.randomUUID(), task, time: parseInt(time) }]);
-      setTask('');
-      setTime('');
+    if (taskName && taskMinutes) {
+      const newTask = {
+        name: taskName,
+        minutes: parseInt(taskMinutes),
+        sortOrder: tasks.length + 1,
+      };
+      setTasks([...tasks, newTask]);
+      setTaskName('');
+      setTaskMinutes('');
     }
   };
 
-  const handlePlay = (index) => {
-    clearInterval(timerRef.current);
-    setCurrentIndex(index);
-    setTimeLeft(tasks[index].time * 60);
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter') {
+      handleAddTask();
+    }
+  };
+
+  const handleFinishedEntering = () => {
+    const sortedTasks = [...tasks].sort((a, b) => a.sortOrder - b.sortOrder);
+    setTasks(sortedTasks);
+    setIsEntering(false);
+  };
+
+  const handleSortOrderChange = (index, newOrder) => {
+    const updatedTasks = [...tasks];
+    updatedTasks[index].sortOrder = parseInt(newOrder) || 0;
+    const reordered = [...updatedTasks].sort((a, b) => a.sortOrder - b.sortOrder);
+    setTasks(reordered);
+  };
+
+  const startTimer = (index) => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    setActiveTaskIndex(index);
+    setTimeLeft(tasks[index].minutes * 60);
+
     timerRef.current = setInterval(() => {
-      setTimeLeft(prev => prev - 1);
+      setTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerRef.current);
+          setActiveTaskIndex(null);
+          return 0;
+        }
+        return prev - 1;
+      });
     }, 1000);
   };
 
-  const handleRemove = (index) => {
-    const updated = [...tasks];
-    updated.splice(index, 1);
-    setTasks(updated);
-    if (index === currentIndex) {
-      clearInterval(timerRef.current);
-      setCurrentIndex(null);
-    }
-  };
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
-  const handleDragEnd = (event) => {
-    const { active, over } = event;
-    if (active.id !== over.id) {
-      const oldIndex = tasks.findIndex(t => t.id === active.id);
-      const newIndex = tasks.findIndex(t => t.id === over.id);
-      setTasks((tasks) => arrayMove(tasks, oldIndex, newIndex));
-    }
-  };
+  const formatTime = (seconds) =>
+    `${Math.floor(seconds / 60)
+      .toString()
+      .padStart(2, '0')}:${(seconds % 60).toString().padStart(2, '0')}`;
+
+  const totalRemaining = tasks.reduce((sum, task, idx) => {
+    return sum + (idx === activeTaskIndex ? Math.ceil(timeLeft / 60) : task.minutes);
+  }, 0);
 
   return (
-    <div className="max-w-xl mx-auto mt-10 p-4">
-      <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
-      <div className="flex gap-2 mb-4">
-        <input
-          type="text"
-          value={task}
-          onChange={(e) => setTask(e.target.value)}
-          placeholder="Task"
-          className="flex-1 border p-2 rounded"
-        />
-        <input
-          type="number"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-          placeholder="Min"
-          className="w-20 border p-2 rounded"
-          onKeyDown={(e) => e.key === 'Enter' && handleAddTask()}
-        />
-        <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
-          Add
-        </button>
-      </div>
+    <div className="max-w-xl mx-auto p-4 font-sans">
+      <h1 className="text-3xl font-bold text-center mb-6">Task Focus Timer</h1>
 
-      {currentIndex !== null && (
-        <div className="mb-4 p-4 border rounded bg-yellow-100">
-          <p>Now Working On: {tasks[currentIndex].task}</p>
-          <p className="text-2xl">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+      {isEntering && (
+        <div className="mb-4 bg-white p-4 rounded shadow space-y-2">
+          <input
+            className="border p-2 w-full rounded"
+            placeholder="Task name"
+            value={taskName}
+            onChange={(e) => setTaskName(e.target.value)}
+            onKeyDown={handleKeyPress}
+          />
+          <input
+            className="border p-2 w-full rounded"
+            placeholder="Minutes"
+            type="number"
+            value={taskMinutes}
+            onChange={(e) => setTaskMinutes(e.target.value)}
+            onKeyDown={handleKeyPress}
+          />
+          <div className="flex gap-2">
+            <button onClick={handleAddTask} className="bg-blue-600 text-white px-4 py-2 rounded">
+              Add Task
+            </button>
+            <button
+              onClick={handleFinishedEntering}
+              className="bg-green-600 text-white px-4 py-2 rounded"
+            >
+              Finished Entering
+            </button>
+          </div>
         </div>
       )}
 
-      <DndContext collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <SortableContext items={tasks.map(task => task.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((t, index) => (
-            <SortableItem
-              key={t.id}
-              id={t.id}
-              task={t.task}
-              time={t.time}
-              onPlay={() => handlePlay(index)}
-              isRunning={currentIndex === index}
-              onRemove={() => handleRemove(index)}
-            />
+      {!isEntering && (
+        <div className="space-y-3">
+          {tasks.map((task, index) => (
+            <div
+              key={index}
+              className="flex items-center justify-between bg-gray-100 p-2 rounded shadow"
+            >
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  value={task.sortOrder}
+                  onChange={(e) => handleSortOrderChange(index, e.target.value)}
+                  className="w-14 p-1 text-center border rounded"
+                />
+                <span className="font-semibold">{task.name}</span>
+                <span className="text-gray-600 text-sm">({task.minutes} min)</span>
+              </div>
+              <button
+                onClick={() => startTimer(index)}
+                className="bg-blue-500 text-white px-3 py-1 rounded"
+              >
+                ▶
+              </button>
+            </div>
           ))}
-        </SortableContext>
-      </DndContext>
+          {activeTaskIndex !== null && (
+            <div className="text-center text-2xl font-mono mt-4">
+              {formatTime(timeLeft)}
+            </div>
+          )}
+          <div className="text-center text-gray-500 mt-2">
+            Total remaining: {totalRemaining} min
+          </div>
+        </div>
+      )}
     </div>
   );
 }
