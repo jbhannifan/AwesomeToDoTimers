@@ -1,116 +1,128 @@
-import { useState, useEffect } from 'react';
+""import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
-  const [taskName, setTaskName] = useState('');
-  const [taskMinutes, setTaskMinutes] = useState('');
-  const [taskOrder, setTaskOrder] = useState('');
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(null);
+  const [inputTask, setInputTask] = useState('');
+  const [inputMinutes, setInputMinutes] = useState('');
+  const [timer, setTimer] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
+  const inputRef = useRef(null);
+  const minutesRef = useRef(null);
+  const [sortPriorities, setSortPriorities] = useState({});
 
-  const handleAddTask = () => {
-    if (!taskName || !taskMinutes) return;
-    const newTask = {
-      name: taskName,
-      minutes: parseInt(taskMinutes),
-      order: parseInt(taskOrder) || tasks.length + 1,
-    };
-    setTasks([...tasks, newTask]);
-    setTaskName('');
-    setTaskMinutes('');
-    setTaskOrder('');
-  };
+  useEffect(() => {
+    let interval = null;
+    if (isRunning && timeLeft > 0) {
+      interval = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && isRunning) {
+      setIsRunning(false);
+      // Optional: Add celebration or sound here
+    }
+    return () => clearInterval(interval);
+  }, [isRunning, timeLeft]);
 
-  const handleReorder = (index, value) => {
-    const updatedTasks = [...tasks];
-    updatedTasks[index].order = parseInt(value) || 0;
-    setTasks(updatedTasks);
-  };
-
-  const sortedTasks = [...tasks].sort((a, b) => a.order - b.order);
-
-  const startTask = (index) => {
-    setCurrentTaskIndex(index);
-    setTimeLeft(sortedTasks[index].minutes * 60);
+  const startTimer = (seconds) => {
+    setTimeLeft(seconds);
     setIsRunning(true);
   };
 
-  useEffect(() => {
-    if (!isRunning || timeLeft <= 0) return;
-    const timer = setInterval(() => setTimeLeft((prev) => prev - 1), 1000);
-    return () => clearInterval(timer);
-  }, [isRunning, timeLeft]);
+  const handleAddTask = () => {
+    if (!inputTask.trim() || !inputMinutes.trim()) return;
+    const newTask = {
+      id: Date.now(),
+      name: inputTask,
+      minutes: parseInt(inputMinutes, 10),
+    };
+    setTasks(prev => [...prev, newTask]);
+    setInputTask('');
+    setInputMinutes('');
+    inputRef.current.focus();
+  };
 
-  useEffect(() => {
-    if (isRunning && timeLeft === 0) {
-      setIsRunning(false);
+  const handleSortChange = (e, taskId) => {
+    const newValue = e.target.value;
+    setSortPriorities(prev => ({ ...prev, [taskId]: newValue }));
+  };
+
+  const handleSortKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      handleAddTask();
     }
-  }, [timeLeft, isRunning]);
+  };
+
+  const handleSortTasks = () => {
+    const sorted = [...tasks].sort((a, b) => {
+      const priorityA = parseInt(sortPriorities[a.id] || 0);
+      const priorityB = parseInt(sortPriorities[b.id] || 0);
+      return priorityA - priorityB;
+    });
+    setTasks(sorted);
+  };
 
   return (
-    <div className="p-6 max-w-xl mx-auto">
-      <h1 className="text-3xl font-bold mb-4">Task Focus Timer</h1>
+    <div className="p-4 max-w-xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
+
       <div className="flex gap-2 mb-4">
         <input
-          type="text"
+          ref={inputRef}
+          value={inputTask}
+          onChange={e => setInputTask(e.target.value)}
           placeholder="Task name"
-          value={taskName}
-          onChange={(e) => setTaskName(e.target.value)}
-          className="border p-2 flex-1"
+          className="border p-2 flex-1 rounded"
         />
         <input
-          type="number"
+          ref={minutesRef}
+          value={inputMinutes}
+          onChange={e => setInputMinutes(e.target.value)}
+          onKeyDown={handleSortKeyDown}
           placeholder="Minutes"
-          value={taskMinutes}
-          onChange={(e) => setTaskMinutes(e.target.value)}
-          className="border p-2 w-24"
-        />
-        <input
+          className="border p-2 w-24 rounded"
           type="number"
-          placeholder="#"
-          value={taskOrder}
-          onChange={(e) => setTaskOrder(e.target.value)}
-          className="border p-2 w-16"
         />
-        <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2">
-          Add
-        </button>
+        <Button onClick={handleAddTask}>Add</Button>
       </div>
 
-      <ul className="space-y-2">
-        {sortedTasks.map((task, index) => (
-          <li
-            key={index}
-            className="border p-2 rounded flex justify-between items-center gap-2"
-          >
-            <div className="flex-1">
-              <strong>{task.name}</strong> ({task.minutes} min)
-            </div>
-            <input
-              type="number"
-              className="w-12 border px-2 py-1 text-center"
-              value={task.order}
-              onChange={(e) => handleReorder(index, e.target.value)}
-            />
-            <button
-              onClick={() => startTask(index)}
-              className="bg-green-500 text-white px-3 py-1"
-            >
-              Start
-            </button>
-          </li>
-        ))}
-      </ul>
-
-      {currentTaskIndex !== null && (
-        <div className="mt-6 p-4 bg-yellow-100 border rounded text-center">
-          <h2 className="text-xl font-semibold mb-2">
-            Current Task: {sortedTasks[currentTaskIndex]?.name || '—'}
-          </h2>
-          <div className="text-3xl">
-            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+      {tasks.length > 0 && (
+        <>
+          <div className="mb-2">
+            <Button onClick={handleSortTasks} className="text-sm">Sort</Button>
           </div>
+          <ul className="space-y-2">
+            {tasks.map(task => (
+              <li key={task.id} className="border p-3 rounded flex justify-between items-center">
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={sortPriorities[task.id] || ''}
+                    onChange={(e) => handleSortChange(e, task.id)}
+                    onKeyDown={handleSortKeyDown}
+                    className="w-12 border rounded p-1 text-center"
+                    placeholder="#"
+                  />
+                  <span>{task.name} - {task.minutes} min</span>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => startTimer(task.minutes * 60)}
+                >
+                  Start
+                </Button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+
+      {isRunning && (
+        <div className="mt-6 text-center">
+          <h2 className="text-xl font-semibold">Time Left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</h2>
         </div>
       )}
     </div>
