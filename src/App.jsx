@@ -113,7 +113,9 @@ export default function App() {
           {tasks.map((task, index) => (
             <div
               key={index}
-              className="flex items-center justify-between bg-gray-100 p-2 rounded shadow"
+              className={`flex items-center justify-between p-2 rounded shadow transition-all duration-200 ${
+                index === activeTaskIndex ? 'bg-yellow-200 border border-yellow-400' : 'bg-gray-100'
+              }`}
             >
               <div className="flex items-center gap-3">
                 <input
