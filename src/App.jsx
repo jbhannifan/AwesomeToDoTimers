@@ -1,117 +1,144 @@
 import React, { useState, useEffect, useRef } from 'react';
-import './index.css';
 
-function TaskFocusTimer() {
-  const [taskName, setTaskName] = useState('');
-  const [taskOrder, setTaskOrder] = useState('');
+function App() {
   const [tasks, setTasks] = useState([]);
+  const [newTask, setNewTask] = useState('');
+  const [minutes, setMinutes] = useState(25);
+  const [sortOrder, setSortOrder] = useState(1);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(null);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [isRunning, setIsRunning] = useState(false);
+  const [timerRunning, setTimerRunning] = useState(false);
   const [completedTasks, setCompletedTasks] = useState([]);
-  const timerRef = useRef(null);
+  const intervalRef = useRef(null);
+
+  // Load completed tasks from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('completedTasks');
+    if (saved) setCompletedTasks(JSON.parse(saved));
+  }, []);
 
   useEffect(() => {
-    if (isRunning && timeLeft > 0) {
-      timerRef.current = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    } else if (timeLeft === 0 && isRunning) {
-      setIsRunning(false);
-      completeTask();
+    if (timerRunning && timeLeft > 0) {
+      intervalRef.current = setInterval(() => {
+        setTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (timeLeft === 0 && timerRunning) {
+      completeCurrentTask();
     }
-    return () => clearTimeout(timerRef.current);
-  }, [isRunning, timeLeft]);
+    return () => clearInterval(intervalRef.current);
+  }, [timerRunning, timeLeft]);
 
   const addTask = () => {
-    if (taskName.trim() && taskOrder.trim()) {
-      const newTask = {
-        id: Date.now(),
-        name: taskName.trim(),
-        order: parseInt(taskOrder),
-        completed: false,
-        timestamp: new Date().toISOString(),
-      };
-      const updatedTasks = [...tasks, newTask].sort((a, b) => a.order - b.order);
-      setTasks(updatedTasks);
-      setTaskName('');
-      setTaskOrder('');
-    }
+    if (!newTask.trim()) return;
+    const newEntry = {
+      text: newTask,
+      minutes: parseInt(minutes, 10),
+      order: parseInt(sortOrder, 10),
+    };
+    const updated = [...tasks, newEntry].sort((a, b) => a.order - b.order);
+    setTasks(updated);
+    setNewTask('');
+    setMinutes(25);
+    setSortOrder(tasks.length + 2);
   };
 
-  const startTask = () => {
-    if (tasks.length > 0 && !isRunning) {
-      setTimeLeft(25 * 60); // 25 minutes
-      setIsRunning(true);
-    }
+  const startTimer = (index) => {
+    setCurrentTaskIndex(index);
+    setTimeLeft(tasks[index].minutes * 60);
+    setTimerRunning(true);
   };
 
-  const completeTask = () => {
-    const [completed, ...remaining] = tasks;
-    if (completed) {
-      setCompletedTasks([...completedTasks, completed]);
-      setTasks(remaining);
-    }
+  const finishEarly = () => {
+    completeCurrentTask();
   };
 
-  const stopEarly = () => {
-    setIsRunning(false);
-    completeTask();
+  const completeCurrentTask = () => {
+    if (currentTaskIndex === null) return;
+    const task = tasks[currentTaskIndex];
+    const now = new Date().toLocaleDateString();
+    const updatedCompleted = [...completedTasks, { ...task, date: now }];
+    setCompletedTasks(updatedCompleted);
+    localStorage.setItem('completedTasks', JSON.stringify(updatedCompleted));
+
+    const updatedTasks = tasks.filter((_, i) => i !== currentTaskIndex);
+    setTasks(updatedTasks);
+    setCurrentTaskIndex(null);
+    setTimeLeft(0);
+    setTimerRunning(false);
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
+  const dailySummary = () => {
+    const today = new Date().toLocaleDateString();
+    return completedTasks.filter(t => t.date === today);
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4 space-y-4">
-      <h1 className="text-2xl font-bold text-center">Task Focus Timer</h1>
-
-      <div className="flex space-x-2">
+    <div className="p-4 max-w-xl mx-auto">
+      <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
+      <div className="flex gap-2 mb-4">
         <input
-          type="text"
+          className="border p-1 w-full"
           placeholder="Task name"
-          value={taskName}
-          onChange={e => setTaskName(e.target.value)}
-          className="flex-1 border p-2 rounded"
+          value={newTask}
+          onChange={e => setNewTask(e.target.value)}
         />
         <input
           type="number"
+          className="border p-1 w-20"
+          placeholder="Min"
+          value={minutes}
+          onChange={e => setMinutes(e.target.value)}
+        />
+        <input
+          type="number"
+          className="border p-1 w-20"
           placeholder="Order"
-          value={taskOrder}
-          onChange={e => setTaskOrder(e.target.value)}
-          className="w-20 border p-2 rounded"
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && addTask()}
         />
-        <button onClick={addTask} className="bg-green-500 text-white px-4 py-2 rounded">Add</button>
+        <button className="bg-blue-500 text-white px-3" onClick={addTask}>Add</button>
       </div>
 
       {tasks.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Upcoming Tasks</h2>
-          <ul className="space-y-1">
-            {tasks.map(task => (
-              <li key={task.id} className="border p-2 rounded bg-white flex justify-between items-center">
-                <span>{task.order}. {task.name}</span>
-              </li>
-            ))}
-          </ul>
-          <button onClick={startTask} className="bg-blue-500 text-white px-4 py-2 rounded">Start Next Task</button>
+        <ul className="mb-4">
+          {tasks.map((task, i) => (
+            <li key={i} className="flex justify-between items-center mb-2 border p-2">
+              <div>
+                <strong>{task.order}.</strong> {task.text} ({task.minutes} min)
+              </div>
+              {!timerRunning && (
+                <button className="bg-green-500 text-white px-2" onClick={() => startTimer(i)}>Start</button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {timerRunning && (
+        <div className="mb-4">
+          <p className="text-xl">Time left: {formatTime(timeLeft)}</p>
+          <button className="bg-red-500 text-white px-3 mt-2" onClick={finishEarly}>Finish Early</button>
         </div>
       )}
 
-      {isRunning && (
-        <div className="text-center space-y-2">
-          <h2 className="text-xl font-semibold">Time Left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</h2>
-          <button onClick={stopEarly} className="bg-red-500 text-white px-4 py-2 rounded">Finish Early</button>
-        </div>
-      )}
-
-      {completedTasks.length > 0 && (
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Completed Tasks</h2>
-          <ul className="space-y-1">
-            {completedTasks.map(task => (
-              <li key={task.id} className="line-through text-gray-500">{task.name}</li>
-            ))}
-          </ul>
-        </div>
-      )}
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold mb-2">Today's Completed Tasks</h2>
+        <ul className="list-disc ml-6">
+          {dailySummary().map((t, i) => (
+            <li key={i}>{t.text} ({t.minutes} min)</li>
+          ))}
+        </ul>
+        <p className="mt-2 text-sm text-gray-500">Total: {dailySummary().reduce((sum, t) => sum + t.minutes, 0)} min</p>
+      </div>
     </div>
   );
 }
 
-export default TaskFocusTimer;
+export default App;
