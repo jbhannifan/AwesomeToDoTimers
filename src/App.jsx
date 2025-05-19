@@ -20,11 +20,16 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-  const [history, setHistory] = useState(() => {
-    const stored = localStorage.getItem('taskHistory');
-    return stored ? JSON.parse(stored) : {};
-  });
+  const [completedToday, setCompletedToday] = useState(0);
+  const [streak, setStreak] = useState(1);
+  const [taskHistory, setTaskHistory] = useState({});
+  const [showSummary, setShowSummary] = useState(false);
   const timerRef = useRef(null);
+
+  useEffect(() => {
+    const today = new Date().toISOString().split('T')[0];
+    setTaskHistory(prev => ({ ...prev, [today]: completedToday }));
+  }, [completedToday]);
 
   const handleAddTask = () => {
     if (!newTask.trim() || !minutes || !sortOrder) return;
@@ -53,18 +58,17 @@ function App() {
   };
 
   const markTaskComplete = () => {
-    const completedTask = tasks[currentTaskIndex];
-    const today = new Date().toISOString().slice(0, 10);
-    const updatedHistory = { ...history, [today]: (history[today] || 0) + 1 };
-    setHistory(updatedHistory);
-    localStorage.setItem('taskHistory', JSON.stringify(updatedHistory));
-
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
     setTasks(updatedTasks);
     setIsRunning(false);
-    setCurrentTaskIndex(prev => prev + 1);
+    setCompletedToday(prev => prev + 1);
+    if (currentTaskIndex + 1 < tasks.length) {
+      setCurrentTaskIndex(prev => prev + 1);
+    } else {
+      setShowSummary(true);
+    }
   };
 
   useEffect(() => {
@@ -85,23 +89,19 @@ function App() {
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
-  const calculateStreak = () => {
-    const dates = Object.keys(history).sort().reverse();
-    let streak = 0;
-    for (let i = 0; i < dates.length; i++) {
-      const date = new Date();
-      date.setDate(date.getDate() - i);
-      const dateString = date.toISOString().slice(0, 10);
-      if (history[dateString]) {
-        streak++;
-      } else {
-        break;
-      }
-    }
-    return streak;
+  const today = new Date().toISOString().split('T')[0];
+  const chartData = {
+    labels: Object.keys(taskHistory),
+    datasets: [
+      {
+        label: 'Tasks Completed',
+        data: Object.values(taskHistory),
+        backgroundColor: 'blue',
+        borderColor: 'black',
+        borderWidth: 2,
+      },
+    ],
   };
-
-  const streak = calculateStreak();
 
   return (
     <div className="p-4 max-w-xl mx-auto">
@@ -167,31 +167,17 @@ function App() {
         </button>
       )}
 
-      {Object.keys(history).length > 0 && (
-        <div className="mt-6">
-          <h2 className="text-lg font-semibold mb-2">Streak: {streak} {streak === 1 ? 'day' : 'days'}</h2>
-          <Bar
-            data={{
-              labels: Object.keys(history),
-              datasets: [{
-                label: 'Tasks Completed',
-                data: Object.values(history),
-                backgroundColor: 'rgba(59, 130, 246, 0.6)',
-                borderColor: 'blue',
-                borderWidth: 1,
-              }],
-            }}
-            options={{
-              scales: {
-                y: {
-                  beginAtZero: true,
-                  precision: 0,
-                },
-              },
-            }}
-          />
+      {showSummary && (
+        <div className="mt-6 p-4 border rounded bg-green-100">
+          <h2 className="text-lg font-bold mb-2">🎉 Session Complete!</h2>
+          <p>Tasks completed: {completedToday}</p>
+          <p>Total time: {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min</p>
+          <p>Streak: {streak} days</p>
         </div>
       )}
+
+      <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
+      <Bar data={chartData} />
     </div>
   );
 }
