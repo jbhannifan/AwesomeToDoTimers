@@ -8,6 +8,7 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const [completedTasks, setCompletedTasks] = useState([]);
   const timerRef = useRef(null);
   const audioRef = useRef(null);
 
@@ -44,6 +45,9 @@ function App() {
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
+    const completedTask = tasks[currentTaskIndex];
+    setCompletedTasks([...completedTasks, { ...completedTask, completedAt: new Date() }]);
+
     const nextIndex = currentTaskIndex + 1;
     setTasks(updatedTasks);
     if (nextIndex < updatedTasks.length) {
@@ -75,12 +79,20 @@ function App() {
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
+  const getTodaySummary = () => {
+    const today = new Date().toDateString();
+    const completedToday = completedTasks.filter(
+      task => new Date(task.completedAt).toDateString() === today
+    );
+    return completedToday.length;
+  };
+
   const currentTask = tasks[currentTaskIndex];
 
   return (
     <div className="p-4 max-w-xl mx-auto">
       <audio ref={audioRef} src="https://www.soundjay.com/buttons/sounds/button-3.mp3" preload="auto" />
-      
+
       {isRunning && currentTask ? (
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">{currentTask.name}</h2>
@@ -141,6 +153,12 @@ function App() {
             <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
               Start Timer
             </button>
+          )}
+
+          {completedTasks.length > 0 && (
+            <p className="text-sm mt-4 text-gray-600">
+              ✅ Completed today: {getTodaySummary()}
+            </p>
           )}
         </>
       )}
