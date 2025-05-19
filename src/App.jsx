@@ -1,128 +1,117 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import './index.css';
 
-const getToday = () => new Date().toISOString().slice(0, 10);
-
-export default function App() {
-  const [tasks, setTasks] = useState([]);
+function TaskFocusTimer() {
   const [taskName, setTaskName] = useState('');
-  const [taskMinutes, setTaskMinutes] = useState('');
-  const [taskRank, setTaskRank] = useState('');
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(null);
+  const [taskOrder, setTaskOrder] = useState('');
+  const [tasks, setTasks] = useState([]);
   const [timeLeft, setTimeLeft] = useState(0);
-  const [completedTasks, setCompletedTasks] = useState(() => {
-    const stored = localStorage.getItem('completedTasks');
-    return stored ? JSON.parse(stored) : {};
-  });
+  const [isRunning, setIsRunning] = useState(false);
+  const [completedTasks, setCompletedTasks] = useState([]);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
-  }, [completedTasks]);
-
-  useEffect(() => {
-    if (timeLeft > 0) {
+    if (isRunning && timeLeft > 0) {
       timerRef.current = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
-    } else if (timeLeft === 0 && currentTaskIndex !== null) {
-      markTaskComplete(currentTaskIndex);
+    } else if (timeLeft === 0 && isRunning) {
+      setIsRunning(false);
+      completeTask();
     }
     return () => clearTimeout(timerRef.current);
-  }, [timeLeft, currentTaskIndex]);
+  }, [isRunning, timeLeft]);
 
   const addTask = () => {
-    if (!taskName || !taskMinutes || !taskRank) return;
-    const newTask = {
-      name: taskName,
-      minutes: parseInt(taskMinutes),
-      rank: parseInt(taskRank),
-      completed: false,
-    };
-    setTasks(prev => [...prev, newTask].sort((a, b) => a.rank - b.rank));
-    setTaskName('');
-    setTaskMinutes('');
-    setTaskRank('');
+    if (taskName.trim() && taskOrder.trim()) {
+      const newTask = {
+        id: Date.now(),
+        name: taskName.trim(),
+        order: parseInt(taskOrder),
+        completed: false,
+        timestamp: new Date().toISOString(),
+      };
+      const updatedTasks = [...tasks, newTask].sort((a, b) => a.order - b.order);
+      setTasks(updatedTasks);
+      setTaskName('');
+      setTaskOrder('');
+    }
   };
 
-  const startTask = index => {
-    setCurrentTaskIndex(index);
-    setTimeLeft(tasks[index].minutes * 60);
+  const startTask = () => {
+    if (tasks.length > 0 && !isRunning) {
+      setTimeLeft(25 * 60); // 25 minutes
+      setIsRunning(true);
+    }
   };
 
-  const markTaskComplete = index => {
-    const today = getToday();
-    const updated = [...tasks];
-    updated[index].completed = true;
-    setTasks(updated);
-    setCurrentTaskIndex(null);
-    setTimeLeft(0);
-    setCompletedTasks(prev => ({
-      ...prev,
-      [today]: [...(prev[today] || []), updated[index].name]
-    }));
+  const completeTask = () => {
+    const [completed, ...remaining] = tasks;
+    if (completed) {
+      setCompletedTasks([...completedTasks, completed]);
+      setTasks(remaining);
+    }
+  };
+
+  const stopEarly = () => {
+    setIsRunning(false);
+    completeTask();
   };
 
   return (
-    <div className="p-4 max-w-xl mx-auto space-y-6">
-      <Card>
-        <CardContent className="space-y-4">
-          <h1 className="text-xl font-bold">Task Focus Timer</h1>
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              className="border p-2"
-              placeholder="Task"
-              value={taskName}
-              onChange={e => setTaskName(e.target.value)}
-            />
-            <input
-              className="border p-2"
-              placeholder="Minutes"
-              type="number"
-              value={taskMinutes}
-              onChange={e => setTaskMinutes(e.target.value)}
-            />
-            <input
-              className="border p-2"
-              placeholder="Rank"
-              type="number"
-              value={taskRank}
-              onChange={e => setTaskRank(e.target.value)}
-              onKeyDown={e => e.key === 'Enter' && addTask()}
-            />
-          </div>
-          <Button onClick={addTask}>Add Task</Button>
-        </CardContent>
-      </Card>
+    <div className="max-w-2xl mx-auto p-4 space-y-4">
+      <h1 className="text-2xl font-bold text-center">Task Focus Timer</h1>
 
-      {tasks.map((task, i) => (
-        <Card key={i} className={task.completed ? 'opacity-50' : ''}>
-          <CardContent className="flex items-center justify-between">
-            <div>
-              <div className="font-semibold">{task.name}</div>
-              <div className="text-sm text-gray-500">{task.minutes} min (Rank {task.rank})</div>
-            </div>
-            {currentTaskIndex === i ? (
-              <div>
-                <div className="text-lg font-mono">{Math.floor(timeLeft / 60)}:{('0' + timeLeft % 60).slice(-2)}</div>
-                <Button variant="outline" onClick={() => markTaskComplete(i)}>Finish Early</Button>
-              </div>
-            ) : (
-              !task.completed && <Button onClick={() => startTask(i)}>Start</Button>
-            )}
-          </CardContent>
-        </Card>
-      ))}
+      <div className="flex space-x-2">
+        <input
+          type="text"
+          placeholder="Task name"
+          value={taskName}
+          onChange={e => setTaskName(e.target.value)}
+          className="flex-1 border p-2 rounded"
+        />
+        <input
+          type="number"
+          placeholder="Order"
+          value={taskOrder}
+          onChange={e => setTaskOrder(e.target.value)}
+          className="w-20 border p-2 rounded"
+          onKeyDown={e => e.key === 'Enter' && addTask()}
+        />
+        <button onClick={addTask} className="bg-green-500 text-white px-4 py-2 rounded">Add</button>
+      </div>
 
-      <Card>
-        <CardContent>
-          <h2 className="text-lg font-semibold mb-2">Daily Summary</h2>
-          {Object.entries(completedTasks).map(([date, items]) => (
-            <div key={date} className="text-sm">
-              <strong>{date}:</strong> {items.join(', ')}
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      {tasks.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Upcoming Tasks</h2>
+          <ul className="space-y-1">
+            {tasks.map(task => (
+              <li key={task.id} className="border p-2 rounded bg-white flex justify-between items-center">
+                <span>{task.order}. {task.name}</span>
+              </li>
+            ))}
+          </ul>
+          <button onClick={startTask} className="bg-blue-500 text-white px-4 py-2 rounded">Start Next Task</button>
+        </div>
+      )}
+
+      {isRunning && (
+        <div className="text-center space-y-2">
+          <h2 className="text-xl font-semibold">Time Left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</h2>
+          <button onClick={stopEarly} className="bg-red-500 text-white px-4 py-2 rounded">Finish Early</button>
+        </div>
+      )}
+
+      {completedTasks.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-lg font-semibold">Completed Tasks</h2>
+          <ul className="space-y-1">
+            {completedTasks.map(task => (
+              <li key={task.id} className="line-through text-gray-500">{task.name}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
+
+export default TaskFocusTimer;
