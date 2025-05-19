@@ -3,140 +3,129 @@ import React, { useState, useEffect, useRef } from 'react';
 function App() {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
-  const [minutes, setMinutes] = useState(25);
-  const [sortOrder, setSortOrder] = useState(1);
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(null);
+  const [minutes, setMinutes] = useState('');
+  const [sortOrder, setSortOrder] = useState('');
   const [timeLeft, setTimeLeft] = useState(0);
-  const [timerRunning, setTimerRunning] = useState(false);
-  const [completedTasks, setCompletedTasks] = useState([]);
-  const intervalRef = useRef(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
+  const timerRef = useRef(null);
 
-  // Load completed tasks from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem('completedTasks');
-    if (saved) setCompletedTasks(JSON.parse(saved));
-  }, []);
+  const handleAddTask = () => {
+    if (!newTask.trim() || !minutes || !sortOrder) return;
+    const newTaskObj = {
+      name: newTask,
+      minutes: parseInt(minutes),
+      sortOrder: parseInt(sortOrder),
+      completed: false,
+    };
+    const updatedTasks = [...tasks, newTaskObj].sort((a, b) => a.sortOrder - b.sortOrder);
+    setTasks(updatedTasks);
+    setNewTask('');
+    setMinutes('');
+    setSortOrder('');
+  };
+
+  const handleStart = () => {
+    if (tasks.length === 0 || isRunning) return;
+    setIsRunning(true);
+    setTimeLeft(tasks[currentTaskIndex].minutes * 60);
+  };
+
+  const handleFinishEarly = () => {
+    clearInterval(timerRef.current);
+    markTaskComplete();
+  };
+
+  const markTaskComplete = () => {
+    const updatedTasks = tasks.map((task, idx) =>
+      idx === currentTaskIndex ? { ...task, completed: true } : task
+    );
+    setTasks(updatedTasks);
+    setIsRunning(false);
+    setCurrentTaskIndex(prev => prev + 1);
+  };
 
   useEffect(() => {
-    if (timerRunning && timeLeft > 0) {
-      intervalRef.current = setInterval(() => {
+    if (isRunning && timeLeft > 0) {
+      timerRef.current = setInterval(() => {
         setTimeLeft(prev => prev - 1);
       }, 1000);
-    } else if (timeLeft === 0 && timerRunning) {
-      completeCurrentTask();
+    } else if (isRunning && timeLeft === 0) {
+      clearInterval(timerRef.current);
+      markTaskComplete();
     }
-    return () => clearInterval(intervalRef.current);
-  }, [timerRunning, timeLeft]);
+    return () => clearInterval(timerRef.current);
+  }, [isRunning, timeLeft]);
 
-  const addTask = () => {
-    if (!newTask.trim()) return;
-    const newEntry = {
-      text: newTask,
-      minutes: parseInt(minutes, 10),
-      order: parseInt(sortOrder, 10),
-    };
-    const updated = [...tasks, newEntry].sort((a, b) => a.order - b.order);
-    setTasks(updated);
-    setNewTask('');
-    setMinutes(25);
-    setSortOrder(tasks.length + 2);
-  };
-
-  const startTimer = (index) => {
-    setCurrentTaskIndex(index);
-    setTimeLeft(tasks[index].minutes * 60);
-    setTimerRunning(true);
-  };
-
-  const finishEarly = () => {
-    completeCurrentTask();
-  };
-
-  const completeCurrentTask = () => {
-    if (currentTaskIndex === null) return;
-    const task = tasks[currentTaskIndex];
-    const now = new Date().toLocaleDateString();
-    const updatedCompleted = [...completedTasks, { ...task, date: now }];
-    setCompletedTasks(updatedCompleted);
-    localStorage.setItem('completedTasks', JSON.stringify(updatedCompleted));
-
-    const updatedTasks = tasks.filter((_, i) => i !== currentTaskIndex);
-    setTasks(updatedTasks);
-    setCurrentTaskIndex(null);
-    setTimeLeft(0);
-    setTimerRunning(false);
-  };
-
-  const formatTime = (seconds) => {
-    const m = Math.floor(seconds / 60);
-    const s = seconds % 60;
-    return `${m}:${s < 10 ? '0' : ''}${s}`;
-  };
-
-  const dailySummary = () => {
-    const today = new Date().toLocaleDateString();
-    return completedTasks.filter(t => t.date === today);
+  const handleSortChange = (index, newSort) => {
+    const updated = [...tasks];
+    updated[index].sortOrder = parseInt(newSort) || 0;
+    setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
+
       <div className="flex gap-2 mb-4">
         <input
-          className="border p-1 w-full"
-          placeholder="Task name"
+          type="text"
+          placeholder="Task"
           value={newTask}
           onChange={e => setNewTask(e.target.value)}
+          className="border p-2 flex-1"
         />
         <input
           type="number"
-          className="border p-1 w-20"
-          placeholder="Min"
+          placeholder="Minutes"
           value={minutes}
           onChange={e => setMinutes(e.target.value)}
+          className="border p-2 w-24"
         />
         <input
           type="number"
-          className="border p-1 w-20"
-          placeholder="Order"
+          placeholder="#"
           value={sortOrder}
           onChange={e => setSortOrder(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && addTask()}
+          className="border p-2 w-16"
         />
-        <button className="bg-blue-500 text-white px-3" onClick={addTask}>Add</button>
+        <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
+          Add
+        </button>
       </div>
 
-      {tasks.length > 0 && (
-        <ul className="mb-4">
-          {tasks.map((task, i) => (
-            <li key={i} className="flex justify-between items-center mb-2 border p-2">
-              <div>
-                <strong>{task.order}.</strong> {task.text} ({task.minutes} min)
-              </div>
-              {!timerRunning && (
-                <button className="bg-green-500 text-white px-2" onClick={() => startTimer(i)}>Start</button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+      <ul className="space-y-2 mb-4">
+        {tasks.map((task, idx) => (
+          <li key={idx} className="border p-2 flex justify-between items-center">
+            <span>
+              {task.name} ({task.minutes} min)
+              {task.completed && ' ✅'}
+            </span>
+            <input
+              type="number"
+              value={task.sortOrder}
+              onChange={e => handleSortChange(idx, e.target.value)}
+              className="border p-1 w-16 text-center"
+            />
+          </li>
+        ))}
+      </ul>
 
-      {timerRunning && (
+      {isRunning && tasks[currentTaskIndex] && (
         <div className="mb-4">
-          <p className="text-xl">Time left: {formatTime(timeLeft)}</p>
-          <button className="bg-red-500 text-white px-3 mt-2" onClick={finishEarly}>Finish Early</button>
+          <p className="font-bold">Now working on: {tasks[currentTaskIndex].name}</p>
+          <p>Time left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+          <button onClick={handleFinishEarly} className="mt-2 text-sm text-red-500 underline">
+            Finish Early
+          </button>
         </div>
       )}
 
-      <div className="mt-6">
-        <h2 className="text-lg font-semibold mb-2">Today's Completed Tasks</h2>
-        <ul className="list-disc ml-6">
-          {dailySummary().map((t, i) => (
-            <li key={i}>{t.text} ({t.minutes} min)</li>
-          ))}
-        </ul>
-        <p className="mt-2 text-sm text-gray-500">Total: {dailySummary().reduce((sum, t) => sum + t.minutes, 0)} min</p>
-      </div>
+      {!isRunning && currentTaskIndex < tasks.length && (
+        <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
+          Start Timer
+        </button>
+      )}
     </div>
   );
 }
