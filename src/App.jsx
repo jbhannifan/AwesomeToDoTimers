@@ -1,4 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  BarElement,
+  CategoryScale,
+  LinearScale,
+  Title,
+  Tooltip,
+  Legend
+} from 'chart.js';
+
+ChartJS.register(BarElement, CategoryScale, LinearScale, Title, Tooltip, Legend);
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -8,9 +20,10 @@ function App() {
   const [timeLeft, setTimeLeft] = useState(0);
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
-  const [completedTasks, setCompletedTasks] = useState([]);
+  const [history, setHistory] = useState(() => JSON.parse(localStorage.getItem('history')) || {});
   const timerRef = useRef(null);
-  const audioRef = useRef(null);
+
+  const today = new Date().toISOString().split('T')[0];
 
   const handleAddTask = () => {
     if (!newTask.trim() || !minutes || !sortOrder) return;
@@ -29,11 +42,8 @@ function App() {
 
   const handleStart = () => {
     if (tasks.length === 0 || isRunning) return;
-    const sorted = [...tasks].sort((a, b) => a.sortOrder - b.sortOrder);
-    setTasks(sorted);
-    setCurrentTaskIndex(0);
     setIsRunning(true);
-    setTimeLeft(sorted[0].minutes * 60);
+    setTimeLeft(tasks[currentTaskIndex].minutes * 60);
   };
 
   const handleFinishEarly = () => {
@@ -45,20 +55,17 @@ function App() {
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
-    const completedTask = tasks[currentTaskIndex];
-    setCompletedTasks([...completedTasks, { ...completedTask, completedAt: new Date() }]);
-
-    const nextIndex = currentTaskIndex + 1;
     setTasks(updatedTasks);
-    if (nextIndex < updatedTasks.length) {
-      setCurrentTaskIndex(nextIndex);
-      setTimeLeft(updatedTasks[nextIndex].minutes * 60);
-    } else {
-      setIsRunning(false);
-    }
-    if (audioRef.current) {
-      audioRef.current.play().catch(() => {});
-    }
+    setIsRunning(false);
+    setCurrentTaskIndex(prev => prev + 1);
+
+    const completedMinutes = tasks[currentTaskIndex].minutes;
+    const updatedHistory = {
+      ...history,
+      [today]: (history[today] || 0) + completedMinutes,
+    };
+    setHistory(updatedHistory);
+    localStorage.setItem('history', JSON.stringify(updatedHistory));
   };
 
   useEffect(() => {
@@ -79,89 +86,96 @@ function App() {
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
-  const getTodaySummary = () => {
-    const today = new Date().toDateString();
-    const completedToday = completedTasks.filter(
-      task => new Date(task.completedAt).toDateString() === today
-    );
-    return completedToday.length;
-  };
+  const streak = Object.keys(history)
+    .sort((a, b) => new Date(b) - new Date(a))
+    .reduce((acc, date) => {
+      if (acc === -1) return 0;
+      const current = new Date();
+      current.setDate(current.getDate() - acc);
+      const target = date;
+      return target === current.toISOString().split('T')[0] ? acc + 1 : -1;
+    }, 0);
 
-  const currentTask = tasks[currentTaskIndex];
+  const chartData = {
+    labels: Object.keys(history),
+    datasets: [
+      {
+        label: 'Minutes Completed',
+        data: Object.values(history),
+        backgroundColor: 'rgba(54, 162, 235, 0.6)',
+      },
+    ],
+  };
 
   return (
     <div className="p-4 max-w-xl mx-auto">
-      <audio ref={audioRef} src="https://www.soundjay.com/buttons/sounds/button-3.mp3" preload="auto" />
+      <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
 
-      {isRunning && currentTask ? (
-        <div className="text-center">
-          <h2 className="text-2xl font-bold mb-4">{currentTask.name}</h2>
-          <p className="text-4xl mb-4">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
-          <button onClick={handleFinishEarly} className="text-red-500 underline">
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Task"
+          value={newTask}
+          onChange={e => setNewTask(e.target.value)}
+          className="border p-2 flex-1"
+        />
+        <input
+          type="number"
+          placeholder="Minutes"
+          value={minutes}
+          onChange={e => setMinutes(e.target.value)}
+          className="border p-2 w-24"
+        />
+        <input
+          type="number"
+          placeholder="#"
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value)}
+          className="border p-2 w-16"
+        />
+        <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
+          Add
+        </button>
+      </div>
+
+      <ul className="space-y-2 mb-4">
+        {tasks.map((task, idx) => (
+          <li key={idx} className="border p-2 flex justify-between items-center">
+            <span>
+              {task.name} ({task.minutes} min)
+              {task.completed && ' ✅'}
+            </span>
+            <input
+              type="number"
+              value={task.sortOrder}
+              onChange={e => handleSortChange(idx, e.target.value)}
+              className="border p-1 w-16 text-center"
+            />
+          </li>
+        ))}
+      </ul>
+
+      {isRunning && tasks[currentTaskIndex] && (
+        <div className="mb-4">
+          <p className="font-bold">Now working on: {tasks[currentTaskIndex].name}</p>
+          <p>Time left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+          <button onClick={handleFinishEarly} className="mt-2 text-sm text-red-500 underline">
             Finish Early
           </button>
         </div>
-      ) : (
-        <>
-          <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
-
-          <div className="flex gap-2 mb-4">
-            <input
-              type="text"
-              placeholder="Task"
-              value={newTask}
-              onChange={e => setNewTask(e.target.value)}
-              className="border p-2 flex-1"
-            />
-            <input
-              type="number"
-              placeholder="Minutes"
-              value={minutes}
-              onChange={e => setMinutes(e.target.value)}
-              className="border p-2 w-24"
-            />
-            <input
-              type="number"
-              placeholder="#"
-              value={sortOrder}
-              onChange={e => setSortOrder(e.target.value)}
-              className="border p-2 w-16"
-            />
-            <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
-              Add
-            </button>
-          </div>
-
-          <ul className="space-y-2 mb-4">
-            {tasks.map((task, idx) => (
-              <li key={idx} className="border p-2 flex justify-between items-center">
-                <span>
-                  {task.name} ({task.minutes} min)
-                  {task.completed && ' ✅'}
-                </span>
-                <input
-                  type="number"
-                  value={task.sortOrder}
-                  onChange={e => handleSortChange(idx, e.target.value)}
-                  className="border p-1 w-16 text-center"
-                />
-              </li>
-            ))}
-          </ul>
-
-          {!isRunning && currentTaskIndex < tasks.length && (
-            <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
-              Start Timer
-            </button>
-          )}
-
-          {completedTasks.length > 0 && (
-            <p className="text-sm mt-4 text-gray-600">
-              ✅ Completed today: {getTodaySummary()}
-            </p>
-          )}
-        </>
       )}
+
+      {!isRunning && currentTaskIndex < tasks.length && (
+        <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
+          Start Timer
+        </button>
+      )}
+
+      <div className="mt-6">
+        <h2 className="text-xl font-semibold mb-2">Daily Summary</h2>
+        <Bar data={chartData} />
+        <p className="mt-2">Current Streak: {streak} day(s)</p>
+      </div>
     </div>
   );
 }
