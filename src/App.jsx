@@ -1,152 +1,128 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+
+const getToday = () => new Date().toISOString().slice(0, 10);
 
 export default function App() {
   const [tasks, setTasks] = useState([]);
   const [taskName, setTaskName] = useState('');
   const [taskMinutes, setTaskMinutes] = useState('');
-  const [taskPriority, setTaskPriority] = useState('');
-  const [isEntering, setIsEntering] = useState(true);
-  const [timer, setTimer] = useState(0);
-  const [activeTaskIndex, setActiveTaskIndex] = useState(null);
-  const intervalRef = useRef(null);
-
-  const totalRemaining = tasks.reduce((sum, task) => sum + (task.remaining || 0), 0);
+  const [taskRank, setTaskRank] = useState('');
+  const [currentTaskIndex, setCurrentTaskIndex] = useState(null);
+  const [timeLeft, setTimeLeft] = useState(0);
+  const [completedTasks, setCompletedTasks] = useState(() => {
+    const stored = localStorage.getItem('completedTasks');
+    return stored ? JSON.parse(stored) : {};
+  });
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    if (timer > 0) {
-      intervalRef.current = setInterval(() => {
-        setTimer((prev) => prev - 1);
-      }, 1000);
-    } else if (timer === 0 && activeTaskIndex !== null) {
-      stopTimer();
+    localStorage.setItem('completedTasks', JSON.stringify(completedTasks));
+  }, [completedTasks]);
+
+  useEffect(() => {
+    if (timeLeft > 0) {
+      timerRef.current = setTimeout(() => setTimeLeft(timeLeft - 1), 1000);
+    } else if (timeLeft === 0 && currentTaskIndex !== null) {
+      markTaskComplete(currentTaskIndex);
     }
-    return () => clearInterval(intervalRef.current);
-  }, [timer]);
+    return () => clearTimeout(timerRef.current);
+  }, [timeLeft, currentTaskIndex]);
 
   const addTask = () => {
-    if (!taskName || !taskMinutes || isNaN(taskMinutes) || !taskPriority || isNaN(taskPriority)) return;
+    if (!taskName || !taskMinutes || !taskRank) return;
     const newTask = {
       name: taskName,
       minutes: parseInt(taskMinutes),
-      remaining: parseInt(taskMinutes),
-      priority: parseInt(taskPriority)
+      rank: parseInt(taskRank),
+      completed: false,
     };
-    setTasks((prev) => [...prev, newTask].sort((a, b) => a.priority - b.priority));
+    setTasks(prev => [...prev, newTask].sort((a, b) => a.rank - b.rank));
     setTaskName('');
     setTaskMinutes('');
-    setTaskPriority('');
+    setTaskRank('');
   };
 
-  const startTask = (index) => {
-    setActiveTaskIndex(index);
-    setTimer(tasks[index].remaining * 60);
+  const startTask = index => {
+    setCurrentTaskIndex(index);
+    setTimeLeft(tasks[index].minutes * 60);
   };
 
-  const stopTimer = () => {
-    clearInterval(intervalRef.current);
-    setTasks((prev) => prev.filter((_, i) => i !== activeTaskIndex));
-    setActiveTaskIndex(null);
-    setTimer(0);
-  };
-
-  const handleKeyPress = (e) => {
-    if (e.key === 'Enter') addTask();
+  const markTaskComplete = index => {
+    const today = getToday();
+    const updated = [...tasks];
+    updated[index].completed = true;
+    setTasks(updated);
+    setCurrentTaskIndex(null);
+    setTimeLeft(0);
+    setCompletedTasks(prev => ({
+      ...prev,
+      [today]: [...(prev[today] || []), updated[index].name]
+    }));
   };
 
   return (
-    <div className="p-4 max-w-xl mx-auto text-center">
-      <h1 className="text-3xl font-bold mb-4">Task Focus Timer</h1>
-
-      {isEntering && (
-        <div className="space-y-2">
-          <input
-            type="text"
-            value={taskName}
-            onChange={(e) => setTaskName(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Task name"
-            className="border p-2 w-full rounded"
-          />
-          <input
-            type="number"
-            value={taskMinutes}
-            onChange={(e) => setTaskMinutes(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Minutes"
-            className="border p-2 w-full rounded"
-          />
-          <input
-            type="number"
-            value={taskPriority}
-            onChange={(e) => setTaskPriority(e.target.value)}
-            onKeyDown={handleKeyPress}
-            placeholder="Priority (e.g., 1, 2, 3...)"
-            className="border p-2 w-full rounded"
-          />
-          <div className="flex gap-2 justify-center">
-            <button
-              onClick={addTask}
-              className="bg-blue-500 text-white px-4 py-2 rounded"
-            >
-              Add Task
-            </button>
-            <button
-              onClick={() => setIsEntering(false)}
-              className="bg-green-600 text-white px-4 py-2 rounded"
-            >
-              Finished Entering
-            </button>
+    <div className="p-4 max-w-xl mx-auto space-y-6">
+      <Card>
+        <CardContent className="space-y-4">
+          <h1 className="text-xl font-bold">Task Focus Timer</h1>
+          <div className="grid grid-cols-3 gap-2">
+            <input
+              className="border p-2"
+              placeholder="Task"
+              value={taskName}
+              onChange={e => setTaskName(e.target.value)}
+            />
+            <input
+              className="border p-2"
+              placeholder="Minutes"
+              type="number"
+              value={taskMinutes}
+              onChange={e => setTaskMinutes(e.target.value)}
+            />
+            <input
+              className="border p-2"
+              placeholder="Rank"
+              type="number"
+              value={taskRank}
+              onChange={e => setTaskRank(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addTask()}
+            />
           </div>
-        </div>
-      )}
+          <Button onClick={addTask}>Add Task</Button>
+        </CardContent>
+      </Card>
 
-      {!isEntering && (
-        <>
-          <div className="space-y-2 mt-6">
-            {tasks.map((task, index) => (
-              <div
-                key={index}
-                className="flex justify-between items-center p-2 bg-gray-100 rounded shadow"
-              >
-                <span className="font-medium">
-                  {task.name} ({task.minutes} min, priority {task.priority})
-                </span>
-                <div className="space-x-2">
-                  <button
-                    onClick={() => startTask(index)}
-                    className="bg-blue-500 text-white px-2 py-1 rounded"
-                  >
-                    ▶️
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          {activeTaskIndex !== null && (
-            <div className="mt-6">
-              <h2 className="text-lg font-semibold mb-2">
-                Working on: {tasks[activeTaskIndex]?.name}
-              </h2>
-              <div className="text-2xl font-bold">{Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}</div>
-              <button
-                onClick={stopTimer}
-                className="mt-4 bg-red-500 text-white px-4 py-2 rounded"
-              >
-                Finished Early
-              </button>
+      {tasks.map((task, i) => (
+        <Card key={i} className={task.completed ? 'opacity-50' : ''}>
+          <CardContent className="flex items-center justify-between">
+            <div>
+              <div className="font-semibold">{task.name}</div>
+              <div className="text-sm text-gray-500">{task.minutes} min (Rank {task.rank})</div>
             </div>
-          )}
+            {currentTaskIndex === i ? (
+              <div>
+                <div className="text-lg font-mono">{Math.floor(timeLeft / 60)}:{('0' + timeLeft % 60).slice(-2)}</div>
+                <Button variant="outline" onClick={() => markTaskComplete(i)}>Finish Early</Button>
+              </div>
+            ) : (
+              !task.completed && <Button onClick={() => startTask(i)}>Start</Button>
+            )}
+          </CardContent>
+        </Card>
+      ))}
 
-          <div className="mt-4 text-gray-600">Total remaining: {totalRemaining} min</div>
-          <button
-            onClick={() => setIsEntering(true)}
-            className="mt-4 text-blue-600 underline"
-          >
-            Add more tasks
-          </button>
-        </>
-      )}
+      <Card>
+        <CardContent>
+          <h2 className="text-lg font-semibold mb-2">Daily Summary</h2>
+          {Object.entries(completedTasks).map(([date, items]) => (
+            <div key={date} className="text-sm">
+              <strong>{date}:</strong> {items.join(', ')}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
     </div>
   );
 }
