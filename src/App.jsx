@@ -24,7 +24,6 @@ function App() {
   const [streak, setStreak] = useState(1);
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
-  const [showCelebration, setShowCelebration] = useState(false);
   const timerRef = useRef(null);
   const audioRef = useRef(null);
 
@@ -52,7 +51,6 @@ function App() {
     if (tasks.length === 0 || isRunning) return;
     setIsRunning(true);
     setTimeLeft(tasks[currentTaskIndex].minutes * 60);
-    setShowCelebration(false);
   };
 
   const handleFinishEarly = () => {
@@ -67,11 +65,7 @@ function App() {
     setTasks(updatedTasks);
     setIsRunning(false);
     setCompletedToday(prev => prev + 1);
-    setShowCelebration(true);
-    if (audioRef.current) {
-      audioRef.current.volume = 0.3;
-      audioRef.current.play().catch(() => {});
-    }
+    audioRef.current?.play();
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
@@ -95,6 +89,12 @@ function App() {
     const updated = [...tasks];
     updated[index].sortOrder = parseInt(newSort) || 0;
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
+  };
+
+  const handleClearCompleted = () => {
+    setTasks(tasks.filter(task => !task.completed));
+    setCurrentTaskIndex(0);
+    setShowSummary(false);
   };
 
   const today = new Date().toISOString().split('T')[0];
@@ -161,32 +161,18 @@ function App() {
 
       {isRunning && tasks[currentTaskIndex] && (
         <div className="mb-4">
-          <p className="font-bold text-xl mb-2">Now working on: {tasks[currentTaskIndex].name}</p>
-          <p className="text-lg">Time left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+          <p className="font-bold">Now working on: {tasks[currentTaskIndex].name}</p>
+          <p>Time left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
           <button onClick={handleFinishEarly} className="mt-2 text-sm text-red-500 underline">
             Finish Early
           </button>
         </div>
       )}
 
-      {!isRunning && currentTaskIndex < tasks.length && !showCelebration && (
+      {!isRunning && currentTaskIndex < tasks.length && (
         <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
           Start Timer
         </button>
-      )}
-
-      {showCelebration && (
-        <div className="mt-6 p-4 border rounded bg-yellow-100 text-center">
-          <h2 className="text-2xl font-bold mb-2">🎉 Great Job!</h2>
-          <p className="mb-2">You completed: {tasks[currentTaskIndex - 1]?.name}</p>
-          {currentTaskIndex < tasks.length ? (
-            <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
-              Start Next Task
-            </button>
-          ) : (
-            <p>All tasks completed!</p>
-          )}
-        </div>
       )}
 
       {showSummary && (
@@ -195,13 +181,15 @@ function App() {
           <p>Tasks completed: {completedToday}</p>
           <p>Total time: {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min</p>
           <p>Streak: {streak} days</p>
+          <button onClick={handleClearCompleted} className="mt-2 bg-red-500 text-white px-4 py-1 rounded">
+            Clear Completed Tasks
+          </button>
         </div>
       )}
 
       <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
       <Bar data={chartData} />
-
-      <audio ref={audioRef} src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3" preload="auto" />
+      <audio ref={audioRef} src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto" />
     </div>
   );
 }
