@@ -24,8 +24,8 @@ function App() {
   const [streak, setStreak] = useState(1);
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const timerRef = useRef(null);
-  const audioRef = useRef(null);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -50,6 +50,7 @@ function App() {
   const handleStart = () => {
     if (tasks.length === 0 || isRunning) return;
     setIsRunning(true);
+    setFocusMode(true);
     setTimeLeft(tasks[currentTaskIndex].minutes * 60);
   };
 
@@ -64,8 +65,8 @@ function App() {
     );
     setTasks(updatedTasks);
     setIsRunning(false);
+    setFocusMode(false);
     setCompletedToday(prev => prev + 1);
-    audioRef.current?.play();
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
@@ -91,12 +92,6 @@ function App() {
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
-  const handleClearCompleted = () => {
-    setTasks(tasks.filter(task => !task.completed));
-    setCurrentTaskIndex(0);
-    setShowSummary(false);
-  };
-
   const today = new Date().toISOString().split('T')[0];
   const chartData = {
     labels: Object.keys(taskHistory),
@@ -110,6 +105,21 @@ function App() {
       },
     ],
   };
+
+  if (focusMode && isRunning && tasks[currentTaskIndex]) {
+    return (
+      <div className="flex flex-col justify-center items-center h-screen bg-black text-white">
+        <h1 className="text-2xl font-bold mb-2">Focusing on:</h1>
+        <h2 className="text-3xl mb-4">{tasks[currentTaskIndex].name}</h2>
+        <p className="text-5xl">
+          {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
+        </p>
+        <button onClick={handleFinishEarly} className="mt-4 bg-red-600 px-4 py-2 rounded">
+          Finish Early
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 max-w-xl mx-auto">
@@ -159,16 +169,6 @@ function App() {
         ))}
       </ul>
 
-      {isRunning && tasks[currentTaskIndex] && (
-        <div className="mb-4">
-          <p className="font-bold">Now working on: {tasks[currentTaskIndex].name}</p>
-          <p>Time left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
-          <button onClick={handleFinishEarly} className="mt-2 text-sm text-red-500 underline">
-            Finish Early
-          </button>
-        </div>
-      )}
-
       {!isRunning && currentTaskIndex < tasks.length && (
         <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
           Start Timer
@@ -179,17 +179,16 @@ function App() {
         <div className="mt-6 p-4 border rounded bg-green-100">
           <h2 className="text-lg font-bold mb-2">🎉 Session Complete!</h2>
           <p>Tasks completed: {completedToday}</p>
-          <p>Total time: {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min</p>
+          <p>
+            Total time:{' '}
+            {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min
+          </p>
           <p>Streak: {streak} days</p>
-          <button onClick={handleClearCompleted} className="mt-2 bg-red-500 text-white px-4 py-1 rounded">
-            Clear Completed Tasks
-          </button>
         </div>
       )}
 
       <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
       <Bar data={chartData} />
-      <audio ref={audioRef} src="https://actions.google.com/sounds/v1/cartoon/clang_and_wobble.ogg" preload="auto" />
     </div>
   );
 }
