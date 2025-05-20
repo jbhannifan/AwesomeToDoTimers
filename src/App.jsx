@@ -24,8 +24,9 @@ function App() {
   const [streak, setStreak] = useState(1);
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
-  const [showTimerScreen, setShowTimerScreen] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
   const timerRef = useRef(null);
+  const audioRef = useRef(null);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
@@ -51,7 +52,7 @@ function App() {
     if (tasks.length === 0 || isRunning) return;
     setIsRunning(true);
     setTimeLeft(tasks[currentTaskIndex].minutes * 60);
-    setShowTimerScreen(true);
+    setShowCelebration(false);
   };
 
   const handleFinishEarly = () => {
@@ -66,12 +67,14 @@ function App() {
     setTasks(updatedTasks);
     setIsRunning(false);
     setCompletedToday(prev => prev + 1);
+    setShowCelebration(true);
+    if (audioRef.current) {
+      audioRef.current.volume = 0.3;
+      audioRef.current.play().catch(() => {});
+    }
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
-      setTimeLeft(tasks[currentTaskIndex + 1].minutes * 60);
-      setIsRunning(true);
     } else {
-      setShowTimerScreen(false);
       setShowSummary(true);
     }
   };
@@ -107,21 +110,6 @@ function App() {
       },
     ],
   };
-
-  if (showTimerScreen && tasks[currentTaskIndex]) {
-    return (
-      <div className="h-screen flex flex-col items-center justify-center bg-gray-100 text-center">
-        <h1 className="text-3xl font-bold mb-2">{tasks[currentTaskIndex].name}</h1>
-        <p className="text-2xl">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
-        <button
-          onClick={handleFinishEarly}
-          className="mt-4 px-4 py-2 bg-red-500 text-white rounded"
-        >
-          Finish Early
-        </button>
-      </div>
-    );
-  }
 
   return (
     <div className="p-4 max-w-xl mx-auto">
@@ -171,10 +159,34 @@ function App() {
         ))}
       </ul>
 
-      {!isRunning && currentTaskIndex < tasks.length && (
+      {isRunning && tasks[currentTaskIndex] && (
+        <div className="mb-4">
+          <p className="font-bold text-xl mb-2">Now working on: {tasks[currentTaskIndex].name}</p>
+          <p className="text-lg">Time left: {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+          <button onClick={handleFinishEarly} className="mt-2 text-sm text-red-500 underline">
+            Finish Early
+          </button>
+        </div>
+      )}
+
+      {!isRunning && currentTaskIndex < tasks.length && !showCelebration && (
         <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
           Start Timer
         </button>
+      )}
+
+      {showCelebration && (
+        <div className="mt-6 p-4 border rounded bg-yellow-100 text-center">
+          <h2 className="text-2xl font-bold mb-2">🎉 Great Job!</h2>
+          <p className="mb-2">You completed: {tasks[currentTaskIndex - 1]?.name}</p>
+          {currentTaskIndex < tasks.length ? (
+            <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
+              Start Next Task
+            </button>
+          ) : (
+            <p>All tasks completed!</p>
+          )}
+        </div>
       )}
 
       {showSummary && (
@@ -188,6 +200,8 @@ function App() {
 
       <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
       <Bar data={chartData} />
+
+      <audio ref={audioRef} src="https://assets.mixkit.co/sfx/preview/mixkit-achievement-bell-600.mp3" preload="auto" />
     </div>
   );
 }
