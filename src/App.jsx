@@ -50,8 +50,8 @@ function App() {
   const handleStart = () => {
     if (tasks.length === 0 || isRunning) return;
     setIsRunning(true);
-    setShowTimerScreen(true);
     setTimeLeft(tasks[currentTaskIndex].minutes * 60);
+    setShowTimerScreen(true);
   };
 
   const handleFinishEarly = () => {
@@ -66,10 +66,12 @@ function App() {
     setTasks(updatedTasks);
     setIsRunning(false);
     setCompletedToday(prev => prev + 1);
-    setShowTimerScreen(false);
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
+      setTimeLeft(tasks[currentTaskIndex + 1].minutes * 60);
+      setIsRunning(true);
     } else {
+      setShowTimerScreen(false);
       setShowSummary(true);
     }
   };
@@ -106,88 +108,86 @@ function App() {
     ],
   };
 
+  if (showTimerScreen && tasks[currentTaskIndex]) {
+    return (
+      <div className="h-screen flex flex-col items-center justify-center bg-gray-100 text-center">
+        <h1 className="text-3xl font-bold mb-2">{tasks[currentTaskIndex].name}</h1>
+        <p className="text-2xl">{Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}</p>
+        <button
+          onClick={handleFinishEarly}
+          className="mt-4 px-4 py-2 bg-red-500 text-white rounded"
+        >
+          Finish Early
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
 
-      {!showTimerScreen && (
-        <>
-          <div className="flex gap-2 mb-4">
-            <input
-              type="text"
-              placeholder="Task"
-              value={newTask}
-              onChange={e => setNewTask(e.target.value)}
-              className="border p-2 flex-1"
-            />
+      <div className="flex gap-2 mb-4">
+        <input
+          type="text"
+          placeholder="Task"
+          value={newTask}
+          onChange={e => setNewTask(e.target.value)}
+          className="border p-2 flex-1"
+        />
+        <input
+          type="number"
+          placeholder="Minutes"
+          value={minutes}
+          onChange={e => setMinutes(e.target.value)}
+          className="border p-2 w-24"
+        />
+        <input
+          type="number"
+          placeholder="#"
+          value={sortOrder}
+          onChange={e => setSortOrder(e.target.value)}
+          className="border p-2 w-16"
+        />
+        <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
+          Add
+        </button>
+      </div>
+
+      <ul className="space-y-2 mb-4">
+        {tasks.map((task, idx) => (
+          <li key={idx} className="border p-2 flex justify-between items-center">
+            <span>
+              {task.name} ({task.minutes} min)
+              {task.completed && ' ✅'}
+            </span>
             <input
               type="number"
-              placeholder="Minutes"
-              value={minutes}
-              onChange={e => setMinutes(e.target.value)}
-              className="border p-2 w-24"
+              value={task.sortOrder}
+              onChange={e => handleSortChange(idx, e.target.value)}
+              className="border p-1 w-16 text-center"
             />
-            <input
-              type="number"
-              placeholder="#"
-              value={sortOrder}
-              onChange={e => setSortOrder(e.target.value)}
-              className="border p-2 w-16"
-            />
-            <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
-              Add
-            </button>
-          </div>
+          </li>
+        ))}
+      </ul>
 
-          <ul className="space-y-2 mb-4">
-            {tasks.map((task, idx) => (
-              <li key={idx} className="border p-2 flex justify-between items-center">
-                <span>
-                  {task.name} ({task.minutes} min)
-                  {task.completed && ' ✅'}
-                </span>
-                <input
-                  type="number"
-                  value={task.sortOrder}
-                  onChange={e => handleSortChange(idx, e.target.value)}
-                  className="border p-1 w-16 text-center"
-                />
-              </li>
-            ))}
-          </ul>
-
-          {!isRunning && currentTaskIndex < tasks.length && (
-            <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
-              Start Timer
-            </button>
-          )}
-
-          {showSummary && (
-            <div className="mt-6 p-4 border rounded bg-green-100">
-              <h2 className="text-lg font-bold mb-2">🎉 Session Complete!</h2>
-              <p>Tasks completed: {completedToday}</p>
-              <p>Total time: {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min</p>
-              <p>Streak: {streak} days</p>
-            </div>
-          )}
-
-          <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
-          <Bar data={chartData} />
-        </>
+      {!isRunning && currentTaskIndex < tasks.length && (
+        <button onClick={handleStart} className="bg-green-500 text-white px-4 py-2 rounded">
+          Start Timer
+        </button>
       )}
 
-      {isRunning && tasks[currentTaskIndex] && showTimerScreen && (
-        <div className="text-center">
-          <p className="font-bold text-lg mb-2">Now working on:</p>
-          <p className="text-xl mb-4">{tasks[currentTaskIndex].name}</p>
-          <p className="text-3xl font-mono">
-            {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
-          </p>
-          <button onClick={handleFinishEarly} className="mt-4 text-sm text-red-500 underline">
-            Finish Early
-          </button>
+      {showSummary && (
+        <div className="mt-6 p-4 border rounded bg-green-100">
+          <h2 className="text-lg font-bold mb-2">🎉 Session Complete!</h2>
+          <p>Tasks completed: {completedToday}</p>
+          <p>Total time: {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min</p>
+          <p>Streak: {streak} days</p>
         </div>
       )}
+
+      <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
+      <Bar data={chartData} />
     </div>
   );
 }
