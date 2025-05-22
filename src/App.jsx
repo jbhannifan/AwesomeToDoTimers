@@ -1,16 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -25,15 +13,16 @@ function App() {
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [completedList, setCompletedList] = useState([]);
-  const [audioPlaying, setAudioPlaying] = useState(false);
+  const [audio, setAudio] = useState(null);
   const timerRef = useRef(null);
-  const audioRef = useRef(null);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    setTaskHistory(prev => ({ ...prev, [today]: completedToday }));
-  }, [completedToday]);
+    setTaskHistory(prev => ({
+      ...prev,
+      [today]: prev[today] || []
+    }));
+  }, []);
 
   const handleAddTask = () => {
     if (!newTask.trim() || !minutes || !sortOrder) return;
@@ -62,44 +51,40 @@ function App() {
     markTaskComplete();
   };
 
+  const stopAlarm = () => {
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      setAudio(null);
+    }
+  };
+
   const markTaskComplete = () => {
     const now = new Date();
+    const today = now.toISOString().split('T')[0];
+    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
-    const completedTask = tasks[currentTaskIndex];
-    setCompletedList(prev => [
-      ...prev,
-      {
-        ...completedTask,
-        time: `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`,
-        date: now.toISOString().split('T')[0],
-      },
-    ]);
     setTasks(updatedTasks);
     setIsRunning(false);
     setFocusMode(false);
     setCompletedToday(prev => prev + 1);
+
+    setTaskHistory(prev => ({
+      ...prev,
+      [today]: [...(prev[today] || []), { ...tasks[currentTaskIndex], time }]
+    }));
+
+    const alarm = new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav');
+    alarm.play();
+    setAudio(alarm);
+
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
       setShowSummary(true);
-    }
-    playAlarm();
-  };
-
-  const playAlarm = () => {
-    if (audioRef.current) {
-      audioRef.current.play();
-      setAudioPlaying(true);
-    }
-  };
-
-  const stopAlarm = () => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
-      setAudioPlaying(false);
     }
   };
 
@@ -121,21 +106,7 @@ function App() {
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
-  const today = new Date().toISOString().split('T')[0];
-  const chartData = {
-    labels: Object.keys(taskHistory),
-    datasets: [
-      {
-        label: 'Tasks Completed',
-        data: Object.values(taskHistory),
-        backgroundColor: 'blue',
-        borderColor: 'black',
-        borderWidth: 2,
-      },
-    ],
-  };
-
-  if (focusMode && tasks[currentTaskIndex]) {
+  if (focusMode && isRunning && tasks[currentTaskIndex]) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-black text-white">
         <h1 className="text-2xl font-bold mb-2">Focusing on:</h1>
@@ -143,17 +114,14 @@ function App() {
         <p className="text-5xl">
           {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
         </p>
-        {isRunning && (
-          <button onClick={handleFinishEarly} className="mt-4 bg-red-600 px-4 py-2 rounded">
-            Finish Early
-          </button>
-        )}
-        {audioPlaying && (
-          <button onClick={stopAlarm} className="mt-2 bg-gray-400 px-4 py-2 rounded">
+        <button onClick={handleFinishEarly} className="mt-4 bg-red-600 px-4 py-2 rounded">
+          Finish Early
+        </button>
+        {audio && (
+          <button onClick={stopAlarm} className="mt-2 bg-yellow-500 px-4 py-1 rounded">
             Stop Alarm
           </button>
         )}
-        <audio ref={audioRef} src="/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav" />
       </div>
     );
   }
@@ -188,7 +156,7 @@ function App() {
           onKeyDown={e => {
             if (e.key === 'Enter') {
               handleAddTask();
-              setTimeout(() => document.querySelector('input[placeholder="Task"]').focus(), 100);
+              setTimeout(() => document.getElementById('taskInput')?.focus(), 0);
             }
           }}
           className="border p-2 w-16"
@@ -233,19 +201,22 @@ function App() {
         </div>
       )}
 
-      <div className="mt-6">
-        <h2 className="text-lg font-bold">Completed Tasks</h2>
-        <ul className="text-sm">
-          {completedList.map((task, idx) => (
-            <li key={idx}>
-              {task.date} - {task.time} - {task.name} ({task.minutes} min)
-            </li>
-          ))}
-        </ul>
+      <h2 className="text-lg font-bold mt-6">Completed Tasks History</h2>
+      <div className="space-y-4 mt-2">
+        {Object.entries(taskHistory).map(([date, tasks]) => (
+          <div key={date} className="border p-2 rounded">
+            <h3 className="font-semibold">{date}</h3>
+            <ul className="ml-4 list-disc">
+              {tasks.map((task, i) => (
+                <li key={i}>{task.name} - {task.minutes} min @ {task.time}</li>
+              ))}
+            </ul>
+            <p className="mt-1 font-semibold">
+              Total: {tasks.reduce((sum, t) => sum + (t.minutes || 0), 0)} min
+            </p>
+          </div>
+        ))}
       </div>
-
-      <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
-      <Bar data={chartData} />
     </div>
   );
 }
