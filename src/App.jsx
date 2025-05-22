@@ -197,4 +197,28 @@ function App() {
         </div>
       )}
 
-      <h2 className="text-lg font-bold mt-6 mb-2">Daily Task Lo
+      <h2 className="text-lg font-bold mt-6 mb-2">Daily Task Log</h2>
+      <div className="space-y-4">
+        {Object.entries(taskHistory).map(([date, tasks]) => (
+          <div key={date} className="p-2 border rounded">
+            <h3 className="font-semibold mb-1">{date}</h3>
+            <ul className="list-disc list-inside">
+              {tasks.map((task, idx) => (
+                <li key={idx}>
+                  {task.name} – {task.minutes} min
+                </li>
+              ))}
+            </ul>
+            <p className="mt-1 font-medium">
+              Total: {tasks.reduce((sum, t) => sum + (t.minutes || 0), 0)} min
+            </p>
+          </div>
+        ))}
+      </div>
+
+      <audio ref={audioRef} src="/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav" />
+    </div>
+  );
+}
+
+export default App;
