@@ -1,4 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -9,21 +21,18 @@ function App() {
   const [isRunning, setIsRunning] = useState(false);
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0);
   const [completedToday, setCompletedToday] = useState(0);
-  const [taskLog, setTaskLog] = useState({});
-  const [focusMode, setFocusMode] = useState(false);
+  const [streak, setStreak] = useState(1);
+  const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
-  const audioRef = useRef(new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav'));
-  const taskInputRef = useRef(null);
+  const [focusMode, setFocusMode] = useState(false);
+  const [completedList, setCompletedList] = useState([]);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   const timerRef = useRef(null);
+  const audioRef = useRef(null);
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    setTaskLog(prev => ({
-      ...prev,
-      [today]: (prev[today] || []).concat(
-        tasks.filter(t => t.completed).map(t => `${t.name} (${t.minutes} min)`)
-      )
-    }));
+    setTaskHistory(prev => ({ ...prev, [today]: completedToday }));
   }, [completedToday]);
 
   const handleAddTask = () => {
@@ -39,7 +48,6 @@ function App() {
     setNewTask('');
     setMinutes('');
     setSortOrder('');
-    taskInputRef.current?.focus();
   };
 
   const handleStart = () => {
@@ -49,22 +57,25 @@ function App() {
     setTimeLeft(tasks[currentTaskIndex].minutes * 60);
   };
 
-  const stopAlarm = () => {
-    const audio = audioRef.current;
-    audio.pause();
-    audio.currentTime = 0;
-  };
-
   const handleFinishEarly = () => {
     clearInterval(timerRef.current);
-    stopAlarm();
     markTaskComplete();
   };
 
   const markTaskComplete = () => {
+    const now = new Date();
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
+    const completedTask = tasks[currentTaskIndex];
+    setCompletedList(prev => [
+      ...prev,
+      {
+        ...completedTask,
+        time: `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`,
+        date: now.toISOString().split('T')[0],
+      },
+    ]);
     setTasks(updatedTasks);
     setIsRunning(false);
     setFocusMode(false);
@@ -73,6 +84,22 @@ function App() {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
       setShowSummary(true);
+    }
+    playAlarm();
+  };
+
+  const playAlarm = () => {
+    if (audioRef.current) {
+      audioRef.current.play();
+      setAudioPlaying(true);
+    }
+  };
+
+  const stopAlarm = () => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setAudioPlaying(false);
     }
   };
 
@@ -83,7 +110,6 @@ function App() {
       }, 1000);
     } else if (isRunning && timeLeft === 0) {
       clearInterval(timerRef.current);
-      audioRef.current.play();
       markTaskComplete();
     }
     return () => clearInterval(timerRef.current);
@@ -96,8 +122,20 @@ function App() {
   };
 
   const today = new Date().toISOString().split('T')[0];
+  const chartData = {
+    labels: Object.keys(taskHistory),
+    datasets: [
+      {
+        label: 'Tasks Completed',
+        data: Object.values(taskHistory),
+        backgroundColor: 'blue',
+        borderColor: 'black',
+        borderWidth: 2,
+      },
+    ],
+  };
 
-  if (focusMode && isRunning && tasks[currentTaskIndex]) {
+  if (focusMode && tasks[currentTaskIndex]) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-black text-white">
         <h1 className="text-2xl font-bold mb-2">Focusing on:</h1>
@@ -105,12 +143,17 @@ function App() {
         <p className="text-5xl">
           {Math.floor(timeLeft / 60)}:{String(timeLeft % 60).padStart(2, '0')}
         </p>
-        <button onClick={handleFinishEarly} className="mt-4 bg-red-600 px-4 py-2 rounded">
-          Finish Early
-        </button>
-        <button onClick={stopAlarm} className="mt-2 bg-gray-400 px-4 py-2 rounded">
-          Stop Alarm
-        </button>
+        {isRunning && (
+          <button onClick={handleFinishEarly} className="mt-4 bg-red-600 px-4 py-2 rounded">
+            Finish Early
+          </button>
+        )}
+        {audioPlaying && (
+          <button onClick={stopAlarm} className="mt-2 bg-gray-400 px-4 py-2 rounded">
+            Stop Alarm
+          </button>
+        )}
+        <audio ref={audioRef} src="/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav" />
       </div>
     );
   }
@@ -121,7 +164,6 @@ function App() {
 
       <div className="flex gap-2 mb-4">
         <input
-          ref={taskInputRef}
           type="text"
           placeholder="Task"
           value={newTask}
@@ -139,9 +181,15 @@ function App() {
           type="number"
           placeholder="#"
           value={sortOrder}
-          onChange={e => setSortOrder(e.target.value)}
-          onKeyDown={e => {
+          onChange={e => {
+            setSortOrder(e.target.value);
             if (e.key === 'Enter') handleAddTask();
+          }}
+          onKeyDown={e => {
+            if (e.key === 'Enter') {
+              handleAddTask();
+              setTimeout(() => document.querySelector('input[placeholder="Task"]').focus(), 100);
+            }
           }}
           className="border p-2 w-16"
         />
@@ -181,22 +229,23 @@ function App() {
             Total time:{' '}
             {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min
           </p>
+          <p>Streak: {streak} days</p>
         </div>
       )}
 
-      <h2 className="text-lg font-bold mt-6 mb-2">Completed Task Log</h2>
-      <ul className="text-sm">
-        {Object.entries(taskLog).map(([date, entries], idx) => (
-          <li key={idx} className="mb-2">
-            <strong>{date}</strong>
-            <ul className="ml-4 list-disc">
-              {entries.map((entry, i) => (
-                <li key={i}>{entry}</li>
-              ))}
-            </ul>
-          </li>
-        ))}
-      </ul>
+      <div className="mt-6">
+        <h2 className="text-lg font-bold">Completed Tasks</h2>
+        <ul className="text-sm">
+          {completedList.map((task, idx) => (
+            <li key={idx}>
+              {task.date} - {task.time} - {task.name} ({task.minutes} min)
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
+      <Bar data={chartData} />
     </div>
   );
 }
