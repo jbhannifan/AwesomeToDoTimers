@@ -27,6 +27,7 @@ function App() {
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [alarmPlaying, setAlarmPlaying] = useState(false);
   const timerRef = useRef(null);
 
   useEffect(() => {
@@ -63,6 +64,7 @@ function App() {
 
   const markTaskComplete = () => {
     alarmAudio.play();
+    setAlarmPlaying(true);
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
@@ -75,6 +77,12 @@ function App() {
     } else {
       setShowSummary(true);
     }
+  };
+
+  const stopAlarm = () => {
+    alarmAudio.pause();
+    alarmAudio.currentTime = 0;
+    setAlarmPlaying(false);
   };
 
   useEffect(() => {
@@ -127,6 +135,12 @@ function App() {
   return (
     <div className="p-4 max-w-xl mx-auto">
       <h1 className="text-2xl font-bold mb-4">Task Focus Timer</h1>
+
+      {alarmPlaying && (
+        <button onClick={stopAlarm} className="mb-4 bg-yellow-400 text-black px-4 py-2 rounded">
+          Stop Alarm
+        </button>
+      )}
 
       <div className="flex gap-2 mb-4">
         <input
