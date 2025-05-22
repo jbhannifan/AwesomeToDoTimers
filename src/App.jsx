@@ -12,6 +12,8 @@ import {
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
+const alarmAudio = new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav');
+
 function App() {
   const [tasks, setTasks] = useState([]);
   const [newTask, setNewTask] = useState('');
@@ -60,6 +62,7 @@ function App() {
   };
 
   const markTaskComplete = () => {
+    alarmAudio.play();
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
