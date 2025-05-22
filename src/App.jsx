@@ -1,16 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -25,12 +13,19 @@ function App() {
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [audio, setAudio] = useState(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
+    const audioEl = new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav');
+    audioEl.loop = true;
+    setAudio(audioEl);
+  }, []);
+
+  useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    setTaskHistory(prev => ({ ...prev, [today]: completedToday }));
-  }, [completedToday]);
+    setTaskHistory(prev => ({ ...prev, [today]: (prev[today] || []) }));
+  }, []);
 
   const handleAddTask = () => {
     if (!newTask.trim() || !minutes || !sortOrder) return;
@@ -59,14 +54,28 @@ function App() {
     markTaskComplete();
   };
 
+  const stopAlarm = () => {
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+  };
+
   const markTaskComplete = () => {
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
+    const today = new Date().toISOString().split('T')[0];
+    const completedTask = tasks[currentTaskIndex];
     setTasks(updatedTasks);
     setIsRunning(false);
     setFocusMode(false);
     setCompletedToday(prev => prev + 1);
+    setTaskHistory(prev => ({
+      ...prev,
+      [today]: [...(prev[today] || []), completedTask]
+    }));
+    if (audio) audio.play();
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
@@ -93,18 +102,6 @@ function App() {
   };
 
   const today = new Date().toISOString().split('T')[0];
-  const chartData = {
-    labels: Object.keys(taskHistory),
-    datasets: [
-      {
-        label: 'Tasks Completed',
-        data: Object.values(taskHistory),
-        backgroundColor: 'blue',
-        borderColor: 'black',
-        borderWidth: 2,
-      },
-    ],
-  };
 
   if (focusMode && isRunning && tasks[currentTaskIndex]) {
     return (
@@ -180,15 +177,34 @@ function App() {
           <h2 className="text-lg font-bold mb-2">🎉 Session Complete!</h2>
           <p>Tasks completed: {completedToday}</p>
           <p>
-            Total time:{' '}
-            {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min
+            Total time: {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min
           </p>
           <p>Streak: {streak} days</p>
         </div>
       )}
 
-      <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
-      <Bar data={chartData} />
+      {audio && (
+        <button onClick={stopAlarm} className="mt-4 bg-gray-500 text-white px-4 py-2 rounded">
+          Stop Alarm
+        </button>
+      )}
+
+      <h2 className="text-lg font-bold mt-6">Completed Tasks</h2>
+      <div className="mt-2">
+        {Object.entries(taskHistory).map(([date, entries]) => (
+          <div key={date} className="mb-4">
+            <h3 className="font-semibold">📅 {date}</h3>
+            <ul className="list-disc ml-6">
+              {entries.map((task, idx) => (
+                <li key={idx}>{task.name} – {task.minutes} min</li>
+              ))}
+            </ul>
+            <p className="mt-1 font-medium">
+              Total: {entries.reduce((total, t) => total + t.minutes, 0)} min
+            </p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
