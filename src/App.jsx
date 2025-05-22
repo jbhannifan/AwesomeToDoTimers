@@ -1,4 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -13,19 +25,15 @@ function App() {
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [audio, setAudio] = useState(null);
+  const [alarmPlaying, setAlarmPlaying] = useState(false);
+  const audioRef = useRef(null);
+  const taskInputRef = useRef(null);
   const timerRef = useRef(null);
 
   useEffect(() => {
-    const audioEl = new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav');
-    audioEl.loop = true;
-    setAudio(audioEl);
-  }, []);
-
-  useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    setTaskHistory(prev => ({ ...prev, [today]: (prev[today] || []) }));
-  }, []);
+    setTaskHistory(prev => ({ ...prev, [today]: completedToday }));
+  }, [completedToday]);
 
   const handleAddTask = () => {
     if (!newTask.trim() || !minutes || !sortOrder) return;
@@ -40,6 +48,7 @@ function App() {
     setNewTask('');
     setMinutes('');
     setSortOrder('');
+    taskInputRef.current?.focus();
   };
 
   const handleStart = () => {
@@ -55,9 +64,10 @@ function App() {
   };
 
   const stopAlarm = () => {
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setAlarmPlaying(false);
     }
   };
 
@@ -65,17 +75,14 @@ function App() {
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
-    const today = new Date().toISOString().split('T')[0];
-    const completedTask = tasks[currentTaskIndex];
     setTasks(updatedTasks);
     setIsRunning(false);
     setFocusMode(false);
     setCompletedToday(prev => prev + 1);
-    setTaskHistory(prev => ({
-      ...prev,
-      [today]: [...(prev[today] || []), completedTask]
-    }));
-    if (audio) audio.play();
+    if (audioRef.current) {
+      audioRef.current.play();
+      setAlarmPlaying(true);
+    }
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
@@ -102,6 +109,13 @@ function App() {
   };
 
   const today = new Date().toISOString().split('T')[0];
+  const completedTasks = tasks.filter(t => t.completed);
+
+  const groupedTasks = completedTasks.reduce((acc, task) => {
+    acc[today] = acc[today] || [];
+    acc[today].push(task);
+    return acc;
+  }, {});
 
   if (focusMode && isRunning && tasks[currentTaskIndex]) {
     return (
@@ -124,6 +138,7 @@ function App() {
 
       <div className="flex gap-2 mb-4">
         <input
+          ref={taskInputRef}
           type="text"
           placeholder="Task"
           value={newTask}
@@ -142,6 +157,7 @@ function App() {
           placeholder="#"
           value={sortOrder}
           onChange={e => setSortOrder(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleAddTask()}
           className="border p-2 w-16"
         />
         <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
@@ -177,34 +193,37 @@ function App() {
           <h2 className="text-lg font-bold mb-2">🎉 Session Complete!</h2>
           <p>Tasks completed: {completedToday}</p>
           <p>
-            Total time: {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min
+            Total time:{' '}
+            {tasks.reduce((total, t) => total + (t.completed ? t.minutes : 0), 0)} min
           </p>
           <p>Streak: {streak} days</p>
         </div>
       )}
 
-      {audio && (
-        <button onClick={stopAlarm} className="mt-4 bg-gray-500 text-white px-4 py-2 rounded">
+      {alarmPlaying && (
+        <button onClick={stopAlarm} className="mt-4 bg-yellow-500 px-4 py-2 rounded">
           Stop Alarm
         </button>
       )}
 
-      <h2 className="text-lg font-bold mt-6">Completed Tasks</h2>
-      <div className="mt-2">
-        {Object.entries(taskHistory).map(([date, entries]) => (
-          <div key={date} className="mb-4">
-            <h3 className="font-semibold">📅 {date}</h3>
-            <ul className="list-disc ml-6">
-              {entries.map((task, idx) => (
-                <li key={idx}>{task.name} – {task.minutes} min</li>
+      <h2 className="text-lg font-bold mt-6">Task Log</h2>
+      <ul className="mt-2 space-y-2">
+        {Object.entries(groupedTasks).map(([date, tasks]) => (
+          <li key={date} className="border p-2">
+            <p className="font-semibold">{date}</p>
+            <ul className="list-disc pl-5">
+              {tasks.map((task, idx) => (
+                <li key={idx}>{task.name} - {task.minutes} min</li>
               ))}
             </ul>
-            <p className="mt-1 font-medium">
-              Total: {entries.reduce((total, t) => total + t.minutes, 0)} min
+            <p className="mt-1 font-semibold">
+              Total: {tasks.reduce((sum, t) => sum + t.minutes, 0)} min
             </p>
-          </div>
+          </li>
         ))}
-      </div>
+      </ul>
+
+      <audio ref={audioRef} src="/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav" preload="auto" />
     </div>
   );
 }
