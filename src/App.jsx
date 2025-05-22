@@ -1,16 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bar } from 'react-chartjs-2';
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  Title,
-  Tooltip,
-  Legend,
-} from 'chart.js';
-
-ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -25,13 +13,19 @@ function App() {
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [alarmPlaying, setAlarmPlaying] = useState(false);
+  const [audioPlaying, setAudioPlaying] = useState(false);
   const timerRef = useRef(null);
-  const audioRef = useRef(new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav'));
+  const audioRef = useRef(null);
+
+  const today = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
-    const today = new Date().toISOString().split('T')[0];
-    setTaskHistory(prev => ({ ...prev, [today]: completedToday }));
+    if (completedToday > 0) {
+      setTaskHistory(prev => ({
+        ...prev,
+        [today]: [...(prev[today] || []), tasks[currentTaskIndex - 1]]
+      }));
+    }
   }, [completedToday]);
 
   const handleAddTask = () => {
@@ -47,13 +41,6 @@ function App() {
     setNewTask('');
     setMinutes('');
     setSortOrder('');
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter') {
-      handleAddTask();
-      document.getElementById('taskInput').focus();
-    }
   };
 
   const handleStart = () => {
@@ -76,8 +63,7 @@ function App() {
     setIsRunning(false);
     setFocusMode(false);
     setCompletedToday(prev => prev + 1);
-    setAlarmPlaying(true);
-    audioRef.current.play();
+    playAlarm();
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
@@ -85,10 +71,19 @@ function App() {
     }
   };
 
+  const playAlarm = () => {
+    if (audioRef.current) {
+      audioRef.current.play();
+      setAudioPlaying(true);
+    }
+  };
+
   const stopAlarm = () => {
-    audioRef.current.pause();
-    audioRef.current.currentTime = 0;
-    setAlarmPlaying(false);
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      setAudioPlaying(false);
+    }
   };
 
   useEffect(() => {
@@ -109,20 +104,6 @@ function App() {
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
-  const today = new Date().toISOString().split('T')[0];
-  const chartData = {
-    labels: Object.keys(taskHistory),
-    datasets: [
-      {
-        label: 'Tasks Completed',
-        data: Object.values(taskHistory),
-        backgroundColor: 'blue',
-        borderColor: 'black',
-        borderWidth: 2,
-      },
-    ],
-  };
-
   if (focusMode && isRunning && tasks[currentTaskIndex]) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-black text-white">
@@ -134,11 +115,12 @@ function App() {
         <button onClick={handleFinishEarly} className="mt-4 bg-red-600 px-4 py-2 rounded">
           Finish Early
         </button>
-        {alarmPlaying && (
-          <button onClick={stopAlarm} className="mt-2 text-yellow-400 underline text-sm">
+        {audioPlaying && (
+          <button onClick={stopAlarm} className="mt-2 bg-white text-black px-4 py-1 rounded">
             Stop Alarm
           </button>
         )}
+        <audio ref={audioRef} src="/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav" />
       </div>
     );
   }
@@ -149,7 +131,6 @@ function App() {
 
       <div className="flex gap-2 mb-4">
         <input
-          id="taskInput"
           type="text"
           placeholder="Task"
           value={newTask}
@@ -167,8 +148,13 @@ function App() {
           type="number"
           placeholder="#"
           value={sortOrder}
-          onChange={e => setSortOrder(e.target.value)}
-          onKeyDown={handleKeyDown}
+          onChange={e => {
+            setSortOrder(e.target.value);
+            if (e.target.value && newTask && minutes) {
+              handleAddTask();
+              setTimeout(() => document.getElementById('task-input')?.focus(), 10);
+            }
+          }}
           className="border p-2 w-16"
         />
         <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
@@ -211,10 +197,4 @@ function App() {
         </div>
       )}
 
-      <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
-      <Bar data={chartData} />
-    </div>
-  );
-}
-
-export default App;
+      <h2 className="text-lg font-bold mt-6 mb-2">Daily Task Lo
