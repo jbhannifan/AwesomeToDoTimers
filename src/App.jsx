@@ -1,4 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { Bar } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  Title,
+  Tooltip,
+  Legend,
+} from 'chart.js';
+
+ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
 
 function App() {
   const [tasks, setTasks] = useState([]);
@@ -13,16 +25,14 @@ function App() {
   const [taskHistory, setTaskHistory] = useState({});
   const [showSummary, setShowSummary] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
-  const [audio, setAudio] = useState(null);
+  const [alarmPlaying, setAlarmPlaying] = useState(false);
   const timerRef = useRef(null);
+  const audioRef = useRef(new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav'));
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0];
-    setTaskHistory(prev => ({
-      ...prev,
-      [today]: prev[today] || []
-    }));
-  }, []);
+    setTaskHistory(prev => ({ ...prev, [today]: completedToday }));
+  }, [completedToday]);
 
   const handleAddTask = () => {
     if (!newTask.trim() || !minutes || !sortOrder) return;
@@ -39,6 +49,13 @@ function App() {
     setSortOrder('');
   };
 
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      handleAddTask();
+      document.getElementById('taskInput').focus();
+    }
+  };
+
   const handleStart = () => {
     if (tasks.length === 0 || isRunning) return;
     setIsRunning(true);
@@ -51,19 +68,7 @@ function App() {
     markTaskComplete();
   };
 
-  const stopAlarm = () => {
-    if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
-      setAudio(null);
-    }
-  };
-
   const markTaskComplete = () => {
-    const now = new Date();
-    const today = now.toISOString().split('T')[0];
-    const time = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
     const updatedTasks = tasks.map((task, idx) =>
       idx === currentTaskIndex ? { ...task, completed: true } : task
     );
@@ -71,21 +76,19 @@ function App() {
     setIsRunning(false);
     setFocusMode(false);
     setCompletedToday(prev => prev + 1);
-
-    setTaskHistory(prev => ({
-      ...prev,
-      [today]: [...(prev[today] || []), { ...tasks[currentTaskIndex], time }]
-    }));
-
-    const alarm = new Audio('/808009__josefpres__piano-loops-071-efect-4-octave-long-loop-120-bpm.wav');
-    alarm.play();
-    setAudio(alarm);
-
+    setAlarmPlaying(true);
+    audioRef.current.play();
     if (currentTaskIndex + 1 < tasks.length) {
       setCurrentTaskIndex(prev => prev + 1);
     } else {
       setShowSummary(true);
     }
+  };
+
+  const stopAlarm = () => {
+    audioRef.current.pause();
+    audioRef.current.currentTime = 0;
+    setAlarmPlaying(false);
   };
 
   useEffect(() => {
@@ -106,6 +109,20 @@ function App() {
     setTasks(updated.sort((a, b) => a.sortOrder - b.sortOrder));
   };
 
+  const today = new Date().toISOString().split('T')[0];
+  const chartData = {
+    labels: Object.keys(taskHistory),
+    datasets: [
+      {
+        label: 'Tasks Completed',
+        data: Object.values(taskHistory),
+        backgroundColor: 'blue',
+        borderColor: 'black',
+        borderWidth: 2,
+      },
+    ],
+  };
+
   if (focusMode && isRunning && tasks[currentTaskIndex]) {
     return (
       <div className="flex flex-col justify-center items-center h-screen bg-black text-white">
@@ -117,8 +134,8 @@ function App() {
         <button onClick={handleFinishEarly} className="mt-4 bg-red-600 px-4 py-2 rounded">
           Finish Early
         </button>
-        {audio && (
-          <button onClick={stopAlarm} className="mt-2 bg-yellow-500 px-4 py-1 rounded">
+        {alarmPlaying && (
+          <button onClick={stopAlarm} className="mt-2 text-yellow-400 underline text-sm">
             Stop Alarm
           </button>
         )}
@@ -132,6 +149,7 @@ function App() {
 
       <div className="flex gap-2 mb-4">
         <input
+          id="taskInput"
           type="text"
           placeholder="Task"
           value={newTask}
@@ -149,16 +167,8 @@ function App() {
           type="number"
           placeholder="#"
           value={sortOrder}
-          onChange={e => {
-            setSortOrder(e.target.value);
-            if (e.key === 'Enter') handleAddTask();
-          }}
-          onKeyDown={e => {
-            if (e.key === 'Enter') {
-              handleAddTask();
-              setTimeout(() => document.getElementById('taskInput')?.focus(), 0);
-            }
-          }}
+          onChange={e => setSortOrder(e.target.value)}
+          onKeyDown={handleKeyDown}
           className="border p-2 w-16"
         />
         <button onClick={handleAddTask} className="bg-blue-500 text-white px-4 py-2 rounded">
@@ -201,22 +211,8 @@ function App() {
         </div>
       )}
 
-      <h2 className="text-lg font-bold mt-6">Completed Tasks History</h2>
-      <div className="space-y-4 mt-2">
-        {Object.entries(taskHistory).map(([date, tasks]) => (
-          <div key={date} className="border p-2 rounded">
-            <h3 className="font-semibold">{date}</h3>
-            <ul className="ml-4 list-disc">
-              {tasks.map((task, i) => (
-                <li key={i}>{task.name} - {task.minutes} min @ {task.time}</li>
-              ))}
-            </ul>
-            <p className="mt-1 font-semibold">
-              Total: {tasks.reduce((sum, t) => sum + (t.minutes || 0), 0)} min
-            </p>
-          </div>
-        ))}
-      </div>
+      <h2 className="text-lg font-bold mt-6">Streak: {streak} Days</h2>
+      <Bar data={chartData} />
     </div>
   );
 }
